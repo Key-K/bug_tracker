@@ -1,5 +1,5 @@
 import { WIDGET_STYLES } from './styles';
-import { getToken, login, clearAuth, initSSO, tryPopupSSO } from './auth';
+import { ensureToken, login, initSSO, tryPopupSSO } from './auth';
 import { createFab, showFab, hideFab } from './fab';
 import { pickElement, type PickedElement } from './element-picker';
 import { createPanel, showPanel, hidePanel, attachPanelEvents, type PanelCallbacks } from './panel';
@@ -346,7 +346,7 @@ async function init(): Promise<void> {
   const fab = createFab(async () => {
     if (fabBusy) return;
 
-    const token = getToken();
+    const token = await ensureToken(apiUrl);
     if (token) {
       startScoutMode();
       return;

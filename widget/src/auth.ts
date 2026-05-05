@@ -34,10 +34,40 @@ const pendingMessages = new Map<number, (data: Record<string, unknown>) => void>
 const SSO_IFRAME_TIMEOUT_MS = 2_000;
 const SSO_MSG_TIMEOUT_MS = 1_500;
 const POPUP_POLL_INTERVAL_MS = 300;
+const TOKEN_REFRESH_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+let refreshPromise: Promise<string | null> | null = null;
 
 /** Validate JWT format: 3 base64url segments separated by dots */
 function isValidJWT(token: string): boolean {
   return /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token);
+}
+
+function getJWTExpiryMs(token: string): number | null {
+  try {
+    const [, payload] = token.split('.');
+    if (!payload) return null;
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+    const json = JSON.parse(atob(padded)) as { exp?: unknown };
+    return typeof json.exp === 'number' ? json.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
+function isExpiredJWT(token: string): boolean {
+  const expiresAt = getJWTExpiryMs(token);
+  return expiresAt === null || expiresAt <= Date.now();
+}
+
+function shouldRefreshJWT(token: string): boolean {
+  const expiresAt = getJWTExpiryMs(token);
+  return expiresAt !== null && expiresAt - Date.now() <= TOKEN_REFRESH_WINDOW_MS;
+}
+
+function isUsableJWT(token: string): boolean {
+  return isValidJWT(token) && !isExpiredJWT(token);
 }
 
 // ============================================================
@@ -73,7 +103,7 @@ function loadFromCookie(): boolean {
       const trimmed = c.trim();
       if (trimmed.startsWith(COOKIE_TOKEN + '=')) {
         const val = trimmed.slice(COOKIE_TOKEN.length + 1);
-        if (isValidJWT(val)) token = val;
+        if (isUsableJWT(val)) token = val;
       }
       if (trimmed.startsWith(COOKIE_USER + '=')) {
         try { user = JSON.parse(decodeURIComponent(trimmed.slice(COOKIE_USER.length + 1))); } catch { /* skip */ }
@@ -155,7 +185,7 @@ function startIframeSSO(apiUrl: string): void {
         // If no token yet, try iframe
         if (!cachedToken) {
           sendSSOMessage('getToken').then((data) => {
-            if (data.token && typeof data.token === 'string' && isValidJWT(data.token)) {
+            if (data.token && typeof data.token === 'string' && isUsableJWT(data.token)) {
               cachedToken = data.token;
               if (data.user && typeof data.user === 'string') {
                 try { cachedUser = JSON.parse(data.user); } catch { /* skip */ }
@@ -215,7 +245,7 @@ export function tryPopupSSO(apiUrl: string): Promise<boolean> {
       const data = e.data;
       if (!data || data.ns !== 'scout-sso-popup') return;
 
-      if (data.token && typeof data.token === 'string' && isValidJWT(data.token)) {
+      if (data.token && typeof data.token === 'string' && isUsableJWT(data.token)) {
         cachedToken = data.token;
         try { cachedUser = data.user ? JSON.parse(data.user) : null; } catch { cachedUser = null; }
         saveToCookie(cachedToken, cachedUser);
@@ -246,9 +276,10 @@ export function tryPopupSSO(apiUrl: string): Promise<boolean> {
 function loadFromLocalStorage(): void {
   try {
     const raw = localStorage.getItem(TOKEN_KEY);
-    cachedToken = (raw && isValidJWT(raw)) ? raw : null;
+    cachedToken = (raw && isUsableJWT(raw)) ? raw : null;
+    if (raw && !cachedToken) saveToLocalStorage(null, null);
     const userRaw = localStorage.getItem(USER_KEY);
-    cachedUser = userRaw ? JSON.parse(userRaw) : null;
+    cachedUser = cachedToken && userRaw ? JSON.parse(userRaw) : null;
   } catch {
     cachedToken = null;
     cachedUser = null;
@@ -299,7 +330,46 @@ export async function initSSO(apiUrl: string): Promise<void> {
 // ============================================================
 
 export function getToken(): string | null {
+  if (cachedToken && isExpiredJWT(cachedToken)) {
+    clearAuth();
+  }
   return cachedToken;
+}
+
+async function refreshAuth(apiUrl: string, token: string): Promise<string | null> {
+  const res = await fetch(`${apiUrl}/api/auth/refresh`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({}),
+  }).catch(() => null);
+
+  if (!res) return token;
+  if (res.status === 401) {
+    clearAuth();
+    return null;
+  }
+  if (!res.ok) return token;
+
+  try {
+    const json: LoginResponse = await res.json();
+    const { token: nextToken, user } = json.data;
+    if (!isUsableJWT(nextToken)) return token;
+    saveAuth(nextToken, user);
+    return nextToken;
+  } catch {
+    return token;
+  }
+}
+
+export async function ensureToken(apiUrl: string): Promise<string | null> {
+  const token = getToken();
+  if (!token) return null;
+  if (!shouldRefreshJWT(token)) return token;
+
+  refreshPromise ??= refreshAuth(apiUrl, token).finally(() => {
+    refreshPromise = null;
+  });
+  return refreshPromise;
 }
 
 export function getUser(): ScoutUser | null {
@@ -346,7 +416,7 @@ let cachedProjectId: string | null = null;
 
 export async function resolveProjectId(apiUrl: string, projectSlug: string): Promise<string> {
   if (cachedProjectId !== null) return cachedProjectId;
-  const token = getToken();
+  const token = await ensureToken(apiUrl);
   if (!token) throw new Error(t('error.unauthorized'));
   const res = await fetch(`${apiUrl}/api/projects/list`, {
     method: 'POST',

@@ -40,6 +40,13 @@ export const authRoutes = new Hono()
     return c.json({ data: { user: userWithoutPassword } });
   })
 
+  .post('/refresh', authMiddleware, async (c) => {
+    const user = c.get('user');
+    const token = signToken(user);
+    const { passwordHash: _, ...userWithoutPassword } = user;
+    return c.json({ data: { token, user: userWithoutPassword } });
+  })
+
   // SSO Validation — external services call this to validate a token/API key
   // No auth required on this endpoint itself (it IS the auth check)
   .post('/validate', zValidator('json', validateTokenSchema), async (c) => {

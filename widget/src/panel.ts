@@ -1,7 +1,7 @@
 import type { PickedElement } from './element-picker';
 import { SCREENSHOT_MIME } from './screenshot';
 import { getRecordingCompressed, resetBuffer, isRecordingAvailable } from './recorder';
-import { getToken, getUser, clearAuth, resolveProjectId, resetProjectCache } from './auth';
+import { ensureToken, getUser, clearAuth, resolveProjectId, resetProjectCache } from './auth';
 import { t } from './i18n';
 
 interface PanelElements {
@@ -498,7 +498,7 @@ export function attachPanelEvents(
     elements.submitBtn.appendChild(document.createTextNode(t('panel.preparing')));
 
     try {
-      const token = getToken();
+      const token = await ensureToken(apiUrl);
       if (!token) throw new Error(t('error.unauthorized'));
 
       // Step 1: Resolve project
@@ -561,6 +561,11 @@ export function attachPanelEvents(
 
       if (!res.ok) {
         const errBody = await res.json().catch(() => null);
+        if (res.status === 401) {
+          clearAuth();
+          resetProjectCache();
+          throw new Error(t('error.sessionExpired'));
+        }
         throw new Error(errBody?.error ?? errBody?.message ?? t('error.submitFailed', { status: String(res.status) }));
       }
 
