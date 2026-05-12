@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "47803182-01ea-4571-9413-5c992fe12d9e",
-  "prevId": "a8ef437c-cd2d-4c14-8038-c4459de8f2dd",
+  "id": "e76716cf-8bf7-4d0a-869a-12c02b6bf02b",
+  "prevId": "47803182-01ea-4571-9413-5c992fe12d9e",
   "tables": {
     "api_keys": {
       "name": "api_keys",
@@ -300,13 +300,6 @@
           "autoincrement": false,
           "default": "'[]'"
         },
-        "repo_url": {
-          "name": "repo_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "autofix_enabled": {
           "name": "autofix_enabled",
           "type": "integer",
@@ -350,6 +343,124 @@
         }
       },
       "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "scout_item_links": {
+      "name": "scout_item_links",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source_item_id": {
+          "name": "source_item_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "target_item_id": {
+          "name": "target_item_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'related'"
+        },
+        "created_by_id": {
+          "name": "created_by_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(datetime('now'))"
+        }
+      },
+      "indexes": {
+        "idx_item_links_source": {
+          "name": "idx_item_links_source",
+          "columns": [
+            "source_item_id"
+          ],
+          "isUnique": false
+        },
+        "idx_item_links_target": {
+          "name": "idx_item_links_target",
+          "columns": [
+            "target_item_id"
+          ],
+          "isUnique": false
+        },
+        "idx_item_links_source_target_type": {
+          "name": "idx_item_links_source_target_type",
+          "columns": [
+            "source_item_id",
+            "target_item_id",
+            "type"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "scout_item_links_source_item_id_scout_items_id_fk": {
+          "name": "scout_item_links_source_item_id_scout_items_id_fk",
+          "tableFrom": "scout_item_links",
+          "tableTo": "scout_items",
+          "columnsFrom": [
+            "source_item_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "scout_item_links_target_item_id_scout_items_id_fk": {
+          "name": "scout_item_links_target_item_id_scout_items_id_fk",
+          "tableFrom": "scout_item_links",
+          "tableTo": "scout_items",
+          "columnsFrom": [
+            "target_item_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "scout_item_links_created_by_id_users_id_fk": {
+          "name": "scout_item_links_created_by_id_users_id_fk",
+          "tableFrom": "scout_item_links",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}

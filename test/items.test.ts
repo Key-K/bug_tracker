@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Hono } from 'hono';
 import { itemRoutes } from '../server/routes/items.js';
+import { projects } from '../server/db/schema.js';
 import { createTestContext, type TestContext } from './helpers.js';
 import { randomUUID } from 'node:crypto';
 
@@ -33,9 +34,9 @@ describe('Items routes', () => {
     });
   }
 
-  async function createTestItem(token?: string) {
+  async function createTestItem(token?: string, projectId = ctx.projectId) {
     const res = await post('/create', {
-      projectId: ctx.projectId,
+      projectId,
       message: 'Test bug report',
       pageUrl: 'http://localhost:3000/page',
       cssSelector: '.btn-submit',
@@ -225,6 +226,130 @@ describe('Items routes', () => {
     const body = await res.json() as any;
     expect(body.data.content).toBe('This is a manual comment');
     expect(body.data.type).toBe('comment');
+  });
+
+  // === LINKS ===
+
+  it('POST /link — agent can link related items', async () => {
+    const first = await createTestItem();
+    const second = await createTestItem();
+
+    const res = await post('/link', {
+      sourceItemId: first.id,
+      targetItemId: second.id,
+      type: 'duplicate',
+    }, ctx.agentToken);
+
+    expect(res.status).toBe(201);
+
+    const getRes = await post('/get', { id: first.id }, ctx.adminToken);
+    const body = await getRes.json() as any;
+    expect(body.data.relatedItems).toHaveLength(1);
+    expect(body.data.relatedItems[0].type).toBe('duplicate');
+    expect(body.data.relatedItems[0].item.id).toBe(second.id);
+  });
+
+  it('POST /link — duplicate link is idempotent', async () => {
+    const first = await createTestItem();
+    const second = await createTestItem();
+
+    const firstRes = await post('/link', {
+      sourceItemId: first.id,
+      targetItemId: second.id,
+      type: 'related',
+    }, ctx.agentToken);
+    const secondRes = await post('/link', {
+      sourceItemId: second.id,
+      targetItemId: first.id,
+      type: 'related',
+    }, ctx.agentToken);
+
+    expect(firstRes.status).toBe(201);
+    expect(secondRes.status).toBe(200);
+
+    const getRes = await post('/get', { id: first.id }, ctx.adminToken);
+    const body = await getRes.json() as any;
+    expect(body.data.relatedItems).toHaveLength(1);
+  });
+
+  it('POST /link — member cannot link items', async () => {
+    const first = await createTestItem();
+    const second = await createTestItem();
+
+    const res = await post('/link', {
+      sourceItemId: first.id,
+      targetItemId: second.id,
+      type: 'related',
+    }, ctx.memberToken);
+
+    expect(res.status).toBe(403);
+  });
+
+  it('POST /link — rejects self-link', async () => {
+    const item = await createTestItem();
+
+    const res = await post('/link', {
+      sourceItemId: item.id,
+      targetItemId: item.id,
+      type: 'related',
+    }, ctx.agentToken);
+
+    expect(res.status).toBe(400);
+  });
+
+  it('POST /link — rejects cross-project links', async () => {
+    const first = await createTestItem();
+    const otherProjectId = randomUUID();
+    ctx.db.insert(projects).values({
+      id: otherProjectId,
+      name: 'Other Project',
+      slug: 'other-project',
+      allowedOrigins: '[]',
+      autofixEnabled: false,
+    }).run();
+    const second = await createTestItem(ctx.adminToken, otherProjectId);
+
+    const res = await post('/link', {
+      sourceItemId: first.id,
+      targetItemId: second.id,
+      type: 'related',
+    }, ctx.adminToken);
+
+    expect(res.status).toBe(400);
+  });
+
+  it('POST /unlink — agent can remove link', async () => {
+    const first = await createTestItem();
+    const second = await createTestItem();
+
+    const linkRes = await post('/link', {
+      sourceItemId: first.id,
+      targetItemId: second.id,
+      type: 'related',
+    }, ctx.agentToken);
+    const linkBody = await linkRes.json() as any;
+
+    const unlinkRes = await post('/unlink', { id: linkBody.data.id }, ctx.agentToken);
+    expect(unlinkRes.status).toBe(200);
+
+    const getRes = await post('/get', { id: first.id }, ctx.adminToken);
+    const body = await getRes.json() as any;
+    expect(body.data.relatedItems).toHaveLength(0);
+  });
+
+  it('POST /unlink — member cannot remove link', async () => {
+    const first = await createTestItem();
+    const second = await createTestItem();
+
+    const linkRes = await post('/link', {
+      sourceItemId: first.id,
+      targetItemId: second.id,
+      type: 'related',
+    }, ctx.agentToken);
+    const linkBody = await linkRes.json() as any;
+
+    const unlinkRes = await post('/unlink', { id: linkBody.data.id }, ctx.memberToken);
+    expect(unlinkRes.status).toBe(403);
   });
 
   // === AUTO-NOTES ===

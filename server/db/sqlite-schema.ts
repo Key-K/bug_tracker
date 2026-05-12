@@ -19,6 +19,7 @@ const CORE_TABLES = [
   'pivot_users_projects',
   'scout_items',
   'scout_item_notes',
+  'scout_item_links',
   'audit_log',
   'webhooks',
   'api_keys',
@@ -123,6 +124,24 @@ const TABLE_SPECS: TableSpec[] = [
       'CREATE INDEX idx_notes_item_created ON scout_item_notes(item_id, created_at)',
     ],
     copyColumns: ['id', 'item_id', 'user_id', 'content', 'type', 'created_at'],
+    primaryKey: ['id'],
+  },
+  {
+    name: 'scout_item_links',
+    createSql: `CREATE TABLE scout_item_links (
+      id TEXT PRIMARY KEY,
+      source_item_id TEXT NOT NULL REFERENCES scout_items(id) ON DELETE CASCADE,
+      target_item_id TEXT NOT NULL REFERENCES scout_items(id) ON DELETE CASCADE,
+      type TEXT NOT NULL DEFAULT 'related',
+      created_by_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    indexSql: [
+      'CREATE INDEX idx_item_links_source ON scout_item_links(source_item_id)',
+      'CREATE INDEX idx_item_links_target ON scout_item_links(target_item_id)',
+      'CREATE INDEX idx_item_links_source_target_type ON scout_item_links(source_item_id, target_item_id, type)',
+    ],
+    copyColumns: ['id', 'source_item_id', 'target_item_id', 'type', 'created_by_id', 'created_at'],
     primaryKey: ['id'],
   },
   {

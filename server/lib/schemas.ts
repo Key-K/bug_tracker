@@ -135,6 +135,18 @@ export const addNoteSchema = z.object({
   content: z.string().min(1).max(5000),
 });
 
+export const itemLinkTypeSchema = z.enum(['related', 'duplicate', 'blocks', 'blocked_by', 'caused_by', 'conflicts']);
+
+export const linkItemSchema = z.object({
+  sourceItemId: uuidSchema,
+  targetItemId: uuidSchema,
+  type: itemLinkTypeSchema.default('related'),
+});
+
+export const unlinkItemSchema = z.object({
+  id: uuidSchema,
+});
+
 // === API Keys ===
 export const createApiKeySchema = z.object({
   projectId: uuidSchema,

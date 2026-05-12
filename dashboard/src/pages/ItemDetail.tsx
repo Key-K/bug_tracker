@@ -4,7 +4,7 @@ import { Fancybox } from '@fancyapps/ui';
 import '@fancyapps/ui/dist/fancybox/fancybox.css';
 import { api } from '../lib/api';
 import { formatDate } from '../lib/date';
-import { isAdmin, storageUrl } from '../lib/auth';
+import { canManageItemLinks, isAdmin, storageUrl } from '../lib/auth';
 import { useSSE, type SSEEventType } from '../hooks/useSSE';
 import { useTranslation } from '../i18n';
 import StatusBadge from '../components/StatusBadge';
@@ -54,6 +54,21 @@ interface ItemData {
   createdAt: string;
   updatedAt: string;
   notes: Note[];
+  relatedItems: RelatedItem[];
+}
+
+interface RelatedItem {
+  id: string;
+  type: string;
+  direction: 'incoming' | 'outgoing';
+  createdAt: string;
+  item: {
+    id: string;
+    message: string;
+    status: string;
+    priority: string | null;
+    createdAt: string;
+  };
 }
 
 interface ParsedMetadata {
@@ -100,6 +115,7 @@ export default function ItemDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const admin = isAdmin();
+  const canLinkItems = canManageItemLinks();
   const { t, locale } = useTranslation();
   const [item, setItem] = useState<ItemData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -124,6 +140,11 @@ export default function ItemDetail() {
   // Assignee state
   const [teamUsers, setTeamUsers] = useState<UserListItem[]>([]);
   const [assigneeLoading, setAssigneeLoading] = useState(false);
+
+  // Related items state
+  const [linkTargetId, setLinkTargetId] = useState('');
+  const [linkType, setLinkType] = useState('related');
+  const [linkSaving, setLinkSaving] = useState(false);
 
   async function loadItem() {
     try {
@@ -316,6 +337,39 @@ export default function ItemDetail() {
     }
   }
 
+  async function handleLinkItem(e: FormEvent) {
+    e.preventDefault();
+    if (!item || !linkTargetId.trim()) return;
+    setLinkSaving(true);
+    try {
+      await api('/api/items/link', {
+        sourceItemId: item.id,
+        targetItemId: linkTargetId.trim(),
+        type: linkType,
+      });
+      setLinkTargetId('');
+      setLinkType('related');
+      await loadItem();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('validation.requestError'));
+    } finally {
+      setLinkSaving(false);
+    }
+  }
+
+  async function handleUnlinkItem(linkId: string) {
+    if (!item) return;
+    setLinkSaving(true);
+    try {
+      await api('/api/items/unlink', { id: linkId });
+      await loadItem();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('validation.requestError'));
+    } finally {
+      setLinkSaving(false);
+    }
+  }
+
   /** Render note content — auto-notes (JSON) get translated, plain text rendered as-is. */
   function renderNoteContent(content: string): string {
     const autoNote = parseAutoNote(content);
@@ -329,6 +383,15 @@ export default function ItemDetail() {
     comment: t('items.detail.notes.types.comment'),
     status_change: t('items.detail.notes.types.status'),
     assignment: t('items.detail.notes.types.assignment'),
+  };
+
+  const linkTypeLabels: Record<string, string> = {
+    related: t('items.detail.links.types.related'),
+    duplicate: t('items.detail.links.types.duplicate'),
+    blocks: t('items.detail.links.types.blocks'),
+    blocked_by: t('items.detail.links.types.blocked_by'),
+    caused_by: t('items.detail.links.types.caused_by'),
+    conflicts: t('items.detail.links.types.conflicts'),
   };
 
   if (loading) {
@@ -676,6 +739,87 @@ export default function ItemDetail() {
           </div>
         </div>
       )}
+
+      {/* Related items */}
+      <div className="mb-4 md:mb-6 rounded-lg border border-gray-200 bg-white p-3 md:p-4">
+        <div className="mb-3 flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h3 className="text-sm font-medium text-gray-800">{t('items.detail.links.title')}</h3>
+            <p className="text-xs text-gray-500">{t('items.detail.links.description')}</p>
+          </div>
+        </div>
+
+        {item.relatedItems.length === 0 ? (
+          <p className="text-sm text-gray-400">{t('items.detail.links.empty')}</p>
+        ) : (
+          <div className="space-y-2">
+            {item.relatedItems.map((link) => (
+              <div key={link.id} className="rounded-md border border-gray-200 bg-gray-50 p-3">
+                <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/items/${link.item.id}`)}
+                    className="min-w-0 text-left"
+                  >
+                    <div className="mb-1 flex flex-wrap items-center gap-2">
+                      <span className="rounded-full bg-gray-200 px-2 py-0.5 text-[11px] font-medium text-gray-700">
+                        {linkTypeLabels[link.type] ?? link.type}
+                      </span>
+                      <StatusBadge status={link.item.status} />
+                      <PriorityBadge priority={link.item.priority} />
+                      <span className="font-mono text-[11px] text-gray-400">#{link.item.id.slice(0, 8)}</span>
+                    </div>
+                    <div className="line-clamp-2 text-sm text-gray-800 hover:text-blue-700">
+                      {link.item.message}
+                    </div>
+                  </button>
+                  {canLinkItems && (
+                    <button
+                      type="button"
+                      onClick={() => handleUnlinkItem(link.id)}
+                      disabled={linkSaving}
+                      className="shrink-0 text-xs text-gray-400 hover:text-red-600 disabled:opacity-50"
+                    >
+                      {t('items.detail.links.unlink')}
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {canLinkItems && (
+          <form onSubmit={handleLinkItem} className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto_auto] md:items-center">
+            <input
+              type="text"
+              value={linkTargetId}
+              onChange={(e) => setLinkTargetId(e.target.value)}
+              placeholder={t('items.detail.links.itemIdPlaceholder')}
+              className="rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
+            />
+            <select
+              value={linkType}
+              onChange={(e) => setLinkType(e.target.value)}
+              className="rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
+            >
+              <option value="related">{t('items.detail.links.types.related')}</option>
+              <option value="duplicate">{t('items.detail.links.types.duplicate')}</option>
+              <option value="blocks">{t('items.detail.links.types.blocks')}</option>
+              <option value="blocked_by">{t('items.detail.links.types.blocked_by')}</option>
+              <option value="caused_by">{t('items.detail.links.types.caused_by')}</option>
+              <option value="conflicts">{t('items.detail.links.types.conflicts')}</option>
+            </select>
+            <button
+              type="submit"
+              disabled={linkSaving || !linkTargetId.trim()}
+              className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+            >
+              {linkSaving ? t('common.saving') : t('items.detail.links.add')}
+            </button>
+          </form>
+        )}
+      </div>
 
       {/* Session recording — full width with scroll on mobile */}
       {recordingUrl && (

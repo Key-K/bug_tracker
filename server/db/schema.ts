@@ -96,6 +96,22 @@ export const scoutItemNotes = sqliteTable('scout_item_notes', {
   index('idx_notes_item_created').on(table.itemId, table.createdAt),
 ]);
 
+// === Scout Item Links ===
+export const scoutItemLinks = sqliteTable('scout_item_links', {
+  id: text('id').primaryKey(),
+  sourceItemId: text('source_item_id').notNull().references(() => scoutItems.id, { onDelete: 'cascade' }),
+  targetItemId: text('target_item_id').notNull().references(() => scoutItems.id, { onDelete: 'cascade' }),
+  type: text('type', {
+    enum: ['related', 'duplicate', 'blocks', 'blocked_by', 'caused_by', 'conflicts'],
+  }).notNull().default('related'),
+  createdById: text('created_by_id').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+}, (table) => [
+  index('idx_item_links_source').on(table.sourceItemId),
+  index('idx_item_links_target').on(table.targetItemId),
+  index('idx_item_links_source_target_type').on(table.sourceItemId, table.targetItemId, table.type),
+]);
+
 // === Webhooks ===
 export const webhooks = sqliteTable('webhooks', {
   id: text('id').primaryKey(),
@@ -136,6 +152,7 @@ export type NewUser = typeof users.$inferInsert;
 export type ScoutItem = typeof scoutItems.$inferSelect;
 export type NewScoutItem = typeof scoutItems.$inferInsert;
 export type ScoutItemNote = typeof scoutItemNotes.$inferSelect;
+export type ScoutItemLink = typeof scoutItemLinks.$inferSelect;
 export type AuditLogEntry = typeof auditLog.$inferSelect;
 export type Webhook = typeof webhooks.$inferSelect;
 export type ApiKey = typeof apiKeys.$inferSelect;

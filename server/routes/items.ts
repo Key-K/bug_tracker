@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
-import { eq, and, desc, count, like } from 'drizzle-orm';
+import { eq, and, desc, count, like, or } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { scoutItems, scoutItemNotes, projects, users } from '../db/schema.js';
+import { scoutItems, scoutItemNotes, scoutItemLinks, projects, users, type ScoutItemLink } from '../db/schema.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { requireRole, checkProjectAccess } from '../middleware/permissions.js';
 import { randomUUID } from 'node:crypto';
@@ -12,6 +12,7 @@ import {
   countItemsSchema, claimItemSchema, resolveItemSchema,
   cancelItemSchema, updateItemStatusSchema, addNoteSchema,
   deleteItemSchema, updateItemSchema, reopenItemSchema,
+  linkItemSchema, unlinkItemSchema,
 } from '../lib/schemas.js';
 import { createItem, claimItem, updateItemStatus, deleteItem, updateItem, reopenItem } from '../services/items.js';
 import { logAudit, getClientIp } from '../services/audit.js';
@@ -35,6 +36,35 @@ function enrichItem(item: typeof scoutItems.$inferSelect) {
     reporterName: getUserName(item.reporterId),
     assigneeName: getUserName(item.assigneeId),
   };
+}
+
+function getRelatedItems(itemId: string) {
+  const links = db.select().from(scoutItemLinks)
+    .where(or(eq(scoutItemLinks.sourceItemId, itemId), eq(scoutItemLinks.targetItemId, itemId)))
+    .orderBy(desc(scoutItemLinks.createdAt))
+    .all();
+
+  return links.map((link) => {
+    const relatedId = link.sourceItemId === itemId ? link.targetItemId : link.sourceItemId;
+    const related = db.select().from(scoutItems).where(eq(scoutItems.id, relatedId)).get();
+    if (!related) return null;
+    return {
+      id: link.id,
+      type: link.type,
+      direction: link.sourceItemId === itemId ? 'outgoing' : 'incoming',
+      createdAt: link.createdAt,
+      item: enrichItem(related),
+    };
+  }).filter((link): link is NonNullable<typeof link> => link !== null);
+}
+
+function normalizeLinkPair(sourceItemId: string, targetItemId: string, type: ScoutItemLink['type']) {
+  if (type === 'blocks' || type === 'blocked_by' || type === 'caused_by') {
+    return { sourceItemId, targetItemId, type };
+  }
+  return sourceItemId < targetItemId
+    ? { sourceItemId, targetItemId, type }
+    : { sourceItemId: targetItemId, targetItemId: sourceItemId, type };
 }
 
 export const itemRoutes = new Hono()
@@ -129,7 +159,7 @@ export const itemRoutes = new Hono()
         userName: getUserName(n.userId),
       }));
 
-      return c.json({ data: { ...enrichItem(item), notes: enrichedNotes } });
+      return c.json({ data: { ...enrichItem(item), notes: enrichedNotes, relatedItems: getRelatedItems(id) } });
     })
 
   // COUNT — all roles
@@ -347,4 +377,78 @@ export const itemRoutes = new Hono()
       dispatchWebhooks(item.projectId, 'item.commented', { item, note }).catch(() => {});
       eventBus.publish({ type: 'item.commented', projectId: item.projectId, payload: { itemId } });
       return c.json({ data: note }, 201);
+    })
+
+  // LINK — agent, admin
+  .post('/link',
+    requireRole('agent', 'admin'),
+    zValidator('json', linkItemSchema),
+    async (c) => {
+      const data = c.req.valid('json');
+      const user = c.get('user');
+
+      if (data.sourceItemId === data.targetItemId) {
+        return c.json({ error: 'Item cannot be linked to itself', code: 'VALIDATION_FAILED' }, 400);
+      }
+
+      const source = db.select().from(scoutItems).where(eq(scoutItems.id, data.sourceItemId)).get();
+      const target = db.select().from(scoutItems).where(eq(scoutItems.id, data.targetItemId)).get();
+      if (!source || !target) throw new NotFoundError('Item', 'ITEM_NOT_FOUND');
+      if (source.projectId !== target.projectId) {
+        return c.json({ error: 'Items must belong to the same project', code: 'VALIDATION_FAILED' }, 400);
+      }
+      if (!checkProjectAccess(user.id, user.role, source.projectId)) {
+        throw new ForbiddenError('Нет доступа к этому проекту', 'NO_PROJECT_ACCESS');
+      }
+
+      const normalized = normalizeLinkPair(data.sourceItemId, data.targetItemId, data.type);
+      const existing = db.select().from(scoutItemLinks)
+        .where(and(
+          eq(scoutItemLinks.sourceItemId, normalized.sourceItemId),
+          eq(scoutItemLinks.targetItemId, normalized.targetItemId),
+          eq(scoutItemLinks.type, normalized.type),
+        ))
+        .get();
+      if (existing) return c.json({ data: existing });
+
+      const id = randomUUID();
+      db.insert(scoutItemLinks).values({
+        id,
+        sourceItemId: normalized.sourceItemId,
+        targetItemId: normalized.targetItemId,
+        type: normalized.type,
+        createdById: user.id,
+      }).run();
+
+      const link = db.select().from(scoutItemLinks).where(eq(scoutItemLinks.id, id)).get()!;
+      logAudit({ userId: user.id, action: 'link_item', entityType: 'item', entityId: data.sourceItemId, details: { targetItemId: data.targetItemId, type: data.type }, ipAddress: getClientIp(c) });
+      eventBus.publish({ type: 'item.updated', projectId: source.projectId, payload: { item: enrichItem(source) } });
+      eventBus.publish({ type: 'item.updated', projectId: target.projectId, payload: { item: enrichItem(target) } });
+      return c.json({ data: link }, 201);
+    })
+
+  // UNLINK — agent, admin
+  .post('/unlink',
+    requireRole('agent', 'admin'),
+    zValidator('json', unlinkItemSchema),
+    async (c) => {
+      const { id } = c.req.valid('json');
+      const user = c.get('user');
+
+      const link = db.select().from(scoutItemLinks).where(eq(scoutItemLinks.id, id)).get();
+      if (!link) throw new NotFoundError('Item link', 'NOT_FOUND');
+
+      const source = db.select().from(scoutItems).where(eq(scoutItems.id, link.sourceItemId)).get();
+      const target = db.select().from(scoutItems).where(eq(scoutItems.id, link.targetItemId)).get();
+      const projectId = source?.projectId ?? target?.projectId;
+      if (!projectId) throw new NotFoundError('Item', 'ITEM_NOT_FOUND');
+      if (!checkProjectAccess(user.id, user.role, projectId)) {
+        throw new ForbiddenError('Нет доступа к этому проекту', 'NO_PROJECT_ACCESS');
+      }
+
+      db.delete(scoutItemLinks).where(eq(scoutItemLinks.id, id)).run();
+      logAudit({ userId: user.id, action: 'unlink_item', entityType: 'item', entityId: link.sourceItemId, details: { targetItemId: link.targetItemId, type: link.type }, ipAddress: getClientIp(c) });
+      if (source) eventBus.publish({ type: 'item.updated', projectId, payload: { item: enrichItem(source) } });
+      if (target) eventBus.publish({ type: 'item.updated', projectId, payload: { item: enrichItem(target) } });
+      return c.json({ data: { ok: true } });
     });

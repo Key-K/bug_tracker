@@ -40,6 +40,11 @@ export function isAdmin(): boolean {
   return user?.role === 'admin';
 }
 
+export function canManageItemLinks(): boolean {
+  const user = getUser();
+  return user?.role === 'admin' || user?.role === 'agent';
+}
+
 export async function login(
   email: string,
   password: string,
