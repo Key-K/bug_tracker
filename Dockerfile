@@ -12,9 +12,8 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY dashboard/package.json dashboard/package.json
 COPY widget/package.json widget/package.json
 
-# 2. Install dependencies + build native addon for better-sqlite3
+# 2. Install dependencies. pnpm-workspace.yaml allows required native build scripts.
 RUN pnpm install --frozen-lockfile
-RUN npx --yes node-gyp rebuild --directory node_modules/.pnpm/better-sqlite3@11.10.0/node_modules/better-sqlite3
 
 # 3. Copy source
 COPY tsconfig.json tsconfig.server.json drizzle.config.ts ./
