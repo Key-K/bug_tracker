@@ -1,0 +1,155 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to deploy
+        required: true
+        default: master
+  workflow_run:
+    workflows: [Docker]
+    branches: [master]
+    types: [completed]
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to configured server
+    runs-on: ubuntu-latest
+    environment: production
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    permissions:
+      contents: read
+
+    steps:
+      - name: Configure SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+          DEPLOY_BASTION_HOST: ${{ vars.DEPLOY_BASTION_HOST }}
+          DEPLOY_BASTION_PORT: ${{ vars.DEPLOY_BASTION_PORT || '22' }}
+          DEPLOY_BASTION_USER: ${{ vars.DEPLOY_BASTION_USER }}
+        run: |
+          set -eu
+          test -n "$DEPLOY_SSH_KEY"
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_USER"
+
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          if [ -n "$DEPLOY_BASTION_HOST" ]; then
+            test -n "$DEPLOY_BASTION_USER"
+            {
+              printf '%s\n' 'Host deploy-bastion'
+              printf '  HostName %s\n' "$DEPLOY_BASTION_HOST"
+              printf '  Port %s\n' "$DEPLOY_BASTION_PORT"
+              printf '  User %s\n' "$DEPLOY_BASTION_USER"
+              printf '%s\n' '  IdentityFile ~/.ssh/deploy_key'
+              printf '%s\n' '  IdentitiesOnly yes'
+              printf '%s\n' '  StrictHostKeyChecking accept-new'
+              printf '\n'
+              printf '%s\n' 'Host deploy-target'
+              printf '  HostName %s\n' "$DEPLOY_HOST"
+              printf '  Port %s\n' "$DEPLOY_PORT"
+              printf '  User %s\n' "$DEPLOY_USER"
+              printf '%s\n' '  IdentityFile ~/.ssh/deploy_key'
+              printf '%s\n' '  IdentitiesOnly yes'
+              printf '%s\n' '  ProxyJump deploy-bastion'
+              printf '%s\n' '  StrictHostKeyChecking accept-new'
+            } > ~/.ssh/config
+          else
+            {
+              printf '%s\n' 'Host deploy-target'
+              printf '  HostName %s\n' "$DEPLOY_HOST"
+              printf '  Port %s\n' "$DEPLOY_PORT"
+              printf '  User %s\n' "$DEPLOY_USER"
+              printf '%s\n' '  IdentityFile ~/.ssh/deploy_key'
+              printf '%s\n' '  IdentitiesOnly yes'
+              printf '%s\n' '  StrictHostKeyChecking accept-new'
+            } > ~/.ssh/config
+          fi
+
+      - name: Deploy with backup
+        env:
+          DEPLOY_REF: ${{ github.event.inputs.ref || github.event.workflow_run.head_branch || 'master' }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+          DEPLOY_COMPOSE_FILE: ${{ vars.DEPLOY_COMPOSE_FILE || 'docker-compose.yml' }}
+          DEPLOY_SERVICE: ${{ vars.DEPLOY_SERVICE || 'scout' }}
+          DEPLOY_IMAGE: ${{ vars.DEPLOY_IMAGE || 'scout-local:master' }}
+          DEPLOY_SOURCE_PATH: ${{ vars.DEPLOY_SOURCE_PATH }}
+          DEPLOY_BACKUP_PATH: ${{ vars.DEPLOY_BACKUP_PATH || 'backups' }}
+        run: |
+          set -eu
+          test -n "$DEPLOY_PATH"
+          test -n "$DEPLOY_SERVICE"
+          test -n "$DEPLOY_IMAGE"
+          test -n "$DEPLOY_SOURCE_PATH"
+
+          ssh deploy-target 'sh -s' \
+            "$DEPLOY_REF" "$DEPLOY_PATH" "$DEPLOY_COMPOSE_FILE" "$DEPLOY_SERVICE" "$DEPLOY_IMAGE" "$DEPLOY_SOURCE_PATH" "$DEPLOY_BACKUP_PATH" <<'REMOTE'
+          set -eu
+
+          ref="$1"
+          deploy_path="$2"
+          compose_file="$3"
+          service="$4"
+          image="$5"
+          source_path="$6"
+          backup_path="$7"
+
+          cd "$deploy_path"
+          docker compose -f "$compose_file" config >/tmp/scout-deploy-compose.yml
+
+          ts="$(date -u +%Y%m%dT%H%M%SZ)"
+          backup_dir="$deploy_path/$backup_path/$ts"
+          mkdir -p "$backup_dir"
+          docker compose -f "$compose_file" config > "$backup_dir/docker-compose.config.yml"
+
+          container="$(docker compose -f "$compose_file" ps -q "$service" || true)"
+          if [ -n "$container" ]; then
+            docker inspect "$container" > "$backup_dir/$service-container-inspect.json"
+            docker inspect "$container" --format '{{range .Mounts}}{{println .Type .Name .Source .Destination}}{{end}}' |
+            while read -r type name source destination; do
+              [ -n "$type" ] || continue
+              safe="$(printf '%s-%s' "$type" "${name:-$destination}" | tr '/ :' '___')"
+              case "$type" in
+                volume)
+                  docker run --rm -v "$name:/mnt/source:ro" -v "$backup_dir:/backup" alpine sh -c "tar -czf /backup/$safe.tgz -C /mnt/source ."
+                  ;;
+                bind)
+                  if [ -e "$source" ]; then
+                    docker run --rm -v "$source:/mnt/source:ro" -v "$backup_dir:/backup" alpine sh -c "tar -czf /backup/$safe.tgz -C /mnt/source ."
+                  fi
+                  ;;
+              esac
+            done
+          fi
+
+          if [ ! -d "$source_path/.git" ]; then
+            git clone https://github.com/scout-dev-org/scout.git "$source_path"
+          fi
+          git -C "$source_path" fetch --prune origin "$ref"
+          git -C "$source_path" checkout "$ref"
+          git -C "$source_path" reset --hard "origin/$ref"
+          docker build -t "$image" "$source_path"
+
+          docker compose -f "$compose_file" up -d --remove-orphans "$service"
+          docker compose -f "$compose_file" ps
+          echo "backup_dir=$backup_dir"
+          REMOTE
+
+      - name: Verify health
+        env:
+          DEPLOY_HEALTH_URL: ${{ vars.DEPLOY_HEALTH_URL }}
+        run: |
+          set -eu
+          test -n "$DEPLOY_HEALTH_URL"
+          curl -fsS "$DEPLOY_HEALTH_URL"
