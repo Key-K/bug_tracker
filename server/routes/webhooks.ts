@@ -27,7 +27,7 @@ export const webhookRoutes = new Hono()
       // Verify project exists
       const project = db.select().from(projects).where(eq(projects.id, projectId)).get();
       if (!project) throw new NotFoundError('Project', 'PROJECT_NOT_FOUND');
-      requireProjectPermission(user.id, user.role, projectId, 'manage_integrations');
+      requireProjectPermission(user.id, user.role, projectId, 'manage_integrations', c.get('apiKey'));
 
       const id = randomUUID();
       db.insert(webhooks).values({
@@ -49,7 +49,7 @@ export const webhookRoutes = new Hono()
     async (c) => {
       const { projectId } = c.req.valid('json');
       const user = c.get('user');
-      requireProjectPermission(user.id, user.role, projectId, 'manage_integrations');
+      requireProjectPermission(user.id, user.role, projectId, 'manage_integrations', c.get('apiKey'));
 
       const items = db.select().from(webhooks)
         .where(eq(webhooks.projectId, projectId))
@@ -67,7 +67,7 @@ export const webhookRoutes = new Hono()
 
       const existing = db.select().from(webhooks).where(eq(webhooks.id, id)).get();
       if (!existing) throw new NotFoundError('Webhook', 'WEBHOOK_NOT_FOUND');
-      requireProjectPermission(user.id, user.role, existing.projectId, 'manage_integrations');
+      requireProjectPermission(user.id, user.role, existing.projectId, 'manage_integrations', c.get('apiKey'));
 
       const updateData: Record<string, unknown> = {
         updatedAt: new Date().toISOString(),
@@ -92,7 +92,7 @@ export const webhookRoutes = new Hono()
 
       const existing = db.select().from(webhooks).where(eq(webhooks.id, id)).get();
       if (!existing) throw new NotFoundError('Webhook', 'WEBHOOK_NOT_FOUND');
-      requireProjectPermission(user.id, user.role, existing.projectId, 'manage_integrations');
+      requireProjectPermission(user.id, user.role, existing.projectId, 'manage_integrations', c.get('apiKey'));
 
       db.delete(webhooks).where(eq(webhooks.id, id)).run();
       logAudit({ userId: user.id, action: 'delete_webhook', entityType: 'webhook', entityId: id, ipAddress: getClientIp(c) });
@@ -108,7 +108,7 @@ export const webhookRoutes = new Hono()
       const hook = db.select().from(webhooks).where(eq(webhooks.id, id)).get();
       if (!hook) throw new NotFoundError('Webhook', 'WEBHOOK_NOT_FOUND');
       const user = c.get('user');
-      requireProjectPermission(user.id, user.role, hook.projectId, 'manage_integrations');
+      requireProjectPermission(user.id, user.role, hook.projectId, 'manage_integrations', c.get('apiKey'));
 
       const result = await sendTestWebhook(hook.url, hook.secret, hook.projectId);
       return c.json({ data: result });

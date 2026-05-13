@@ -149,6 +149,8 @@ Update later:
 npx skills update scout-manual-workflow -g -y
 ```
 
+Create an OpenCode API key from the dashboard: `Projects` → target project → `Manage integrations` → `Create OpenCode key`. The full `sk_live_*` key is shown once together with a ready-to-copy `SCOUT_*` env block. Store it in a password manager or local ignored credential store, not in the repository.
+
 See `skills/README.md` for project-local install commands and required `SCOUT_*` environment variables.
 
 ## API

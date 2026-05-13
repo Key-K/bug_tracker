@@ -6,6 +6,7 @@ import Login from './pages/Login';
 import Items from './pages/Items';
 import ItemDetail from './pages/ItemDetail';
 import Projects from './pages/Projects';
+import ProjectIntegrations from './pages/ProjectIntegrations';
 import Users from './pages/Users';
 import Webhooks from './pages/Webhooks';
 
@@ -34,6 +35,7 @@ export default function App() {
             <Route path="items" element={<Items />} />
             <Route path="items/:id" element={<ItemDetail />} />
             <Route path="projects" element={<Projects />} />
+            <Route path="projects/:id/integrations" element={<ProjectIntegrations />} />
             <Route path="webhooks" element={<Webhooks />} />
             <Route path="users" element={<Users />} />
           </Route>

@@ -69,6 +69,10 @@ function assertCanManageUser(currentUser: typeof users.$inferSelect, targetUserI
 
 export const userRoutes = new Hono()
   .use('/*', authMiddleware)
+  .use('/*', async (c, next) => {
+    if (c.get('apiKey')) throw new ForbiddenError('API keys cannot manage users', 'FORBIDDEN');
+    await next();
+  })
 
   // CREATE
   .post('/create',

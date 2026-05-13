@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { Link } from 'react-router';
 import { api } from '../lib/api';
 import { useTranslation } from '../i18n';
 import Pagination from '../components/Pagination';
@@ -54,36 +55,6 @@ export default function Projects() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-
-  function getWidgetCode(project: Project): string {
-    const scoutUrl = window.location.origin;
-    return `<script>\n  window.__SCOUT_CONFIG__ = {\n    apiUrl: '${scoutUrl}',\n    projectSlug: '${project.slug}',\n  };\n</script>\n<script src="${scoutUrl}/widget/scout-widget.js" async></script>`;
-  }
-
-  function copyWidgetCode(project: Project, button: HTMLButtonElement) {
-    const code = getWidgetCode(project);
-    const previousText = button.textContent;
-    const fallbackCopy = () => {
-      const textarea = document.createElement('textarea');
-      textarea.value = code;
-      textarea.style.position = 'fixed';
-      textarea.style.left = '-9999px';
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand('copy');
-      textarea.remove();
-    };
-
-    if (navigator.clipboard?.writeText) {
-      void navigator.clipboard.writeText(code).catch(fallbackCopy);
-    } else {
-      fallbackCopy();
-    }
-    button.textContent = t('projects.widget.copied');
-    window.setTimeout(() => {
-      button.textContent = previousText;
-    }, 1800);
-  }
 
   async function loadProjects() {
     setLoading(true);
@@ -204,7 +175,7 @@ export default function Projects() {
               <th className="px-4 py-3">{t('projects.table.name')}</th>
               <th className="px-4 py-3">{t('projects.table.slug')}</th>
               <th className="px-4 py-3">{t('projects.table.origins')}</th>
-              <th className="px-4 py-3">{t('projects.table.widget')}</th>
+              <th className="px-4 py-3">{t('projects.table.integrations')}</th>
               <th className="px-4 py-3 w-24 text-center">{t('projects.table.active')}</th>
               <th className="px-4 py-3 w-28 text-right">{t('projects.table.actions')}</th>
             </tr>
@@ -235,21 +206,9 @@ export default function Projects() {
                     {p.allowedOrigins.join(', ') || '—'}
                   </td>
                   <td className="px-4 py-3 align-top">
-                    <details className="group max-w-md">
-                      <summary className="cursor-pointer text-sm font-medium text-blue-600 hover:underline">
-                        {t('projects.widget.show')}
-                      </summary>
-                      <div className="mt-2 rounded-md border border-gray-200 bg-gray-950 p-3 text-gray-100">
-                        <pre className="max-w-sm overflow-x-auto whitespace-pre-wrap break-all text-xs leading-relaxed"><code>{getWidgetCode(p)}</code></pre>
-                        <button
-                          type="button"
-                          onClick={(event) => copyWidgetCode(p, event.currentTarget)}
-                          className="mt-2 rounded border border-gray-700 px-2 py-1 text-xs font-medium text-gray-100 hover:bg-gray-800"
-                        >
-                          {t('projects.widget.copy')}
-                        </button>
-                      </div>
-                    </details>
+                    <Link to={`/projects/${p.id}/integrations`} className="text-sm font-medium text-blue-600 hover:underline">
+                      {t('projects.integrations.manage')}
+                    </Link>
                   </td>
                   <td className="px-4 py-3 text-center">
                     <Toggle
@@ -308,19 +267,12 @@ export default function Projects() {
                   {p.allowedOrigins.join(', ')}
                 </div>
               )}
-              <details className="mt-2 rounded-md border border-gray-200 bg-gray-50 p-2">
-                <summary className="cursor-pointer text-xs font-medium text-blue-600">
-                  {t('projects.widget.show')}
-                </summary>
-                <pre className="mt-2 max-h-36 overflow-auto rounded bg-gray-950 p-2 text-[11px] leading-relaxed text-gray-100"><code>{getWidgetCode(p)}</code></pre>
-                <button
-                  type="button"
-                  onClick={(event) => copyWidgetCode(p, event.currentTarget)}
-                  className="mt-2 rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-white"
-                >
-                  {t('projects.widget.copy')}
-                </button>
-              </details>
+              <Link
+                to={`/projects/${p.id}/integrations`}
+                className="mt-2 inline-flex rounded-md border border-blue-200 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50"
+              >
+                {t('projects.integrations.manage')}
+              </Link>
               <div className="mt-2.5 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <label className="flex items-center gap-1.5 text-xs text-gray-500">

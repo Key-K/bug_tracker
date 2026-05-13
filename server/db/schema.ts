@@ -135,10 +135,13 @@ export const apiKeys = sqliteTable('api_keys', {
   projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   name: text('name').notNull(), // "CI/CD", "Slack Bot", etc.
+  purpose: text('purpose', { enum: ['opencode', 'ci', 'integration', 'custom'] }).notNull().default('custom'),
+  scopes: text('scopes').notNull().default('["items:read","items:create","items:comment","items:workflow","items:triage","storage:read"]'), // JSON array of allowed API key scopes
   keyHash: text('key_hash').notNull(), // bcrypt hash of the key
   keyPrefix: text('key_prefix').notNull(), // first 16 chars for identification (e.g., "sk_live_a1b2c3d4")
   lastUsedAt: text('last_used_at'),
   expiresAt: text('expires_at'), // null = never expires
+  revokedAt: text('revoked_at'),
   isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
   createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
 }, (table) => [

@@ -50,12 +50,15 @@ describe('API Keys routes', () => {
     const res = await post('/create', {
       projectId: ctx.projectId,
       name: 'My CI Key',
+      purpose: 'opencode',
     }, ctx.adminToken);
 
     expect(res.status).toBe(201);
     const body = await res.json() as any;
     expect(body.data.key).toBeDefined();
     expect(body.data.name).toBe('My CI Key');
+    expect(body.data.purpose).toBe('opencode');
+    expect(body.data.scopes).toEqual(['items:read', 'items:comment', 'items:workflow', 'items:triage', 'storage:read']);
     expect(body.data.projectId).toBe(ctx.projectId);
     expect(body.data.id).toBeDefined();
   });
@@ -105,6 +108,9 @@ describe('API Keys routes', () => {
     const key = body.data.items[0];
     expect(key.keyPrefix).toBe(created.keyPrefix);
     expect(key.name).toBe('Test Key');
+    expect(key.purpose).toBe('custom');
+    expect(key.scopes).toEqual(['items:read']);
+    expect(key.userName).toBe('Test Admin');
     // Full key should NOT be present in list response
     expect(key.key).toBeUndefined();
     expect(key.keyHash).toBeUndefined();
@@ -136,6 +142,18 @@ describe('API Keys routes', () => {
     const listRes = await post('/list', { projectId: ctx.projectId }, ctx.adminToken);
     const listBody = await listRes.json() as any;
     expect(listBody.data.items[0].isActive).toBe(false);
+    expect(listBody.data.items[0].revokedAt).toBeTruthy();
+  });
+
+  it('POST /create — API key cannot create another API key', async () => {
+    const created = await createTestApiKey();
+
+    const res = await post('/create', {
+      projectId: ctx.projectId,
+      name: 'Nested Key',
+    }, created.key);
+
+    expect(res.status).toBe(403);
   });
 
   it('POST /revoke — non-admin cannot revoke (403)', async () => {

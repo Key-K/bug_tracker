@@ -154,9 +154,21 @@ export const unlinkItemSchema = z.object({
 });
 
 // === API Keys ===
+const apiKeyPurposeEnum = z.enum(['opencode', 'ci', 'integration', 'custom']);
+const apiKeyScopeEnum = z.enum([
+  'items:read',
+  'items:create',
+  'items:comment',
+  'items:workflow',
+  'items:triage',
+  'storage:read',
+]);
+
 export const createApiKeySchema = z.object({
   projectId: uuidSchema,
   name: z.string().min(1).max(100),
+  purpose: apiKeyPurposeEnum.default('custom'),
+  scopes: z.array(apiKeyScopeEnum).min(1).optional(),
   expiresAt: z.string().datetime().optional(),
 });
 

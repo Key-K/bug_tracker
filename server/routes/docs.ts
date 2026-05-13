@@ -225,10 +225,14 @@ const spec = {
           id: { type: 'string', format: 'uuid' },
           projectId: { type: 'string', format: 'uuid' },
           userId: { type: 'string', format: 'uuid' },
+          userName: { type: 'string', nullable: true },
           name: { type: 'string' },
+          purpose: { type: 'string', enum: ['opencode', 'ci', 'integration', 'custom'] },
+          scopes: { type: 'array', items: { type: 'string' } },
           keyPrefix: { type: 'string', description: 'First 16 characters of the key (e.g. sk_live_a1b2c3d4)' },
           lastUsedAt: { type: 'string', format: 'date-time', nullable: true },
           expiresAt: { type: 'string', format: 'date-time', nullable: true },
+          revokedAt: { type: 'string', format: 'date-time', nullable: true },
           isActive: { type: 'boolean' },
           createdAt: { type: 'string', format: 'date-time' },
         },
@@ -336,7 +340,7 @@ const spec = {
         tags: ['Auth'],
         summary: 'Текущий пользователь',
         description: 'Возвращает данные текущего авторизованного пользователя.',
-        security: [{ BearerAuth: [] }, { ApiKeyAuth: [] }],
+        security: [{ BearerAuth: [] }],
         responses: {
           200: {
             description: 'Данные пользователя',
@@ -404,7 +408,7 @@ const spec = {
         tags: ['Items'],
         summary: 'Создать баг-репорт',
         description: 'Создаёт новый item в проекте. Требуется project permission `create_item` (admin/owner/manager/reporter). Rate limit: 20 req/min.',
-        security: [{ BearerAuth: [] }, { ApiKeyAuth: [] }],
+        security: [{ BearerAuth: [] }],
         requestBody: {
           required: true,
           content: {
@@ -453,7 +457,7 @@ const spec = {
         tags: ['Items'],
         summary: 'Список items',
         description: 'Пагинированный список items проекта с фильтрацией. Требуется доступ к проекту.',
-        security: [{ BearerAuth: [] }, { ApiKeyAuth: [] }],
+        security: [{ BearerAuth: [] }],
         requestBody: {
           required: true,
           content: {
@@ -1475,7 +1479,7 @@ const spec = {
       post: {
         tags: ['API Keys'],
         summary: 'Создать API-ключ',
-        description: 'Генерирует новый API-ключ для проекта. Полный ключ возвращается ТОЛЬКО один раз. Требуется project permission `manage_integrations` (admin/owner).',
+        description: 'Генерирует новый project-scoped API-ключ. Полный ключ возвращается ТОЛЬКО один раз. Требуется project permission `manage_integrations` (admin/owner/manager). API keys не могут выпускать другие API keys.',
         security: [{ BearerAuth: [] }, { ApiKeyAuth: [] }],
         requestBody: {
           required: true,
@@ -1487,6 +1491,8 @@ const spec = {
                 properties: {
                   projectId: { type: 'string', format: 'uuid' },
                   name: { type: 'string', minLength: 1, maxLength: 100, description: 'Human-readable name (e.g. "CI/CD", "Slack Bot")' },
+                  purpose: { type: 'string', enum: ['opencode', 'ci', 'integration', 'custom'], default: 'custom' },
+                  scopes: { type: 'array', items: { type: 'string' }, description: 'Optional explicit scopes. Defaults are chosen from purpose.' },
                   expiresAt: { type: 'string', format: 'date-time', description: 'Optional expiration date. Null = never expires.' },
                 },
               },
@@ -1507,6 +1513,8 @@ const spec = {
                         key: { type: 'string', description: 'Full API key (sk_live_...). Shown only once!' },
                         id: { type: 'string', format: 'uuid' },
                         name: { type: 'string' },
+                        purpose: { type: 'string' },
+                        scopes: { type: 'array', items: { type: 'string' } },
                         keyPrefix: { type: 'string' },
                         projectId: { type: 'string', format: 'uuid' },
                         expiresAt: { type: 'string', format: 'date-time', nullable: true },
@@ -1526,7 +1534,7 @@ const spec = {
       post: {
         tags: ['API Keys'],
         summary: 'Список API-ключей',
-        description: 'Список API-ключей проекта (без полного ключа, только prefix). Требуется project permission `manage_integrations` (admin/owner).',
+        description: 'Список API-ключей проекта (без полного ключа, только prefix). Требуется project permission `manage_integrations` (admin/owner/manager).',
         security: [{ BearerAuth: [] }, { ApiKeyAuth: [] }],
         requestBody: {
           required: true,
@@ -1569,7 +1577,7 @@ const spec = {
       post: {
         tags: ['API Keys'],
         summary: 'Отозвать API-ключ',
-        description: 'Деактивирует API-ключ (isActive = false). Требуется project permission `manage_integrations` (admin/owner).',
+        description: 'Отзывает API-ключ (isActive = false, revokedAt = now). Требуется project permission `manage_integrations` (admin/owner/manager).',
         security: [{ BearerAuth: [] }, { ApiKeyAuth: [] }],
         requestBody: {
           required: true,

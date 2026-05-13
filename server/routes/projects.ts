@@ -46,6 +46,17 @@ export const projectRoutes = new Hono()
       const { page, perPage } = c.req.valid('json');
       const user = c.get('user');
 
+      const apiKey = c.get('apiKey');
+      if (apiKey) {
+        const project = db.select().from(projects).where(eq(projects.id, apiKey.projectId)).get();
+        return c.json({
+          data: {
+            items: project ? [project] : [],
+            pagination: { page, perPage, total: project ? 1 : 0, totalPages: project ? 1 : 0 },
+          },
+        });
+      }
+
       // Non-admin users only see projects they're assigned to
       if (user.role !== 'admin') {
         const accessibleProjectIds = db.select({ projectId: pivotUsersProjects.projectId })
@@ -109,7 +120,7 @@ export const projectRoutes = new Hono()
       if (!project) throw new NotFoundError('Project', 'PROJECT_NOT_FOUND');
 
       // Check project access
-      if (!checkProjectAccess(user.id, user.role, id)) {
+      if (!checkProjectAccess(user.id, user.role, id, c.get('apiKey'))) {
         throw new ForbiddenError('Нет доступа к этому проекту', 'NO_PROJECT_ACCESS');
       }
 
@@ -125,7 +136,7 @@ export const projectRoutes = new Hono()
 
       const existing = db.select().from(projects).where(eq(projects.id, id)).get();
       if (!existing) throw new NotFoundError('Project', 'PROJECT_NOT_FOUND');
-      requireProjectPermission(user.id, user.role, id, 'manage_project');
+      requireProjectPermission(user.id, user.role, id, 'manage_project', c.get('apiKey'));
 
       const updateData: Record<string, unknown> = {
         updatedAt: new Date().toISOString(),

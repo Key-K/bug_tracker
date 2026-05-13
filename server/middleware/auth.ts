@@ -2,7 +2,7 @@ import { createMiddleware } from 'hono/factory';
 import { eq, and } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import { db } from '../db/client.js';
-import { users, apiKeys, type User } from '../db/schema.js';
+import { users, apiKeys, type ApiKey, type User } from '../db/schema.js';
 import { verifyToken } from '../services/auth.js';
 import { UnauthorizedError } from '../lib/errors.js';
 
@@ -10,7 +10,64 @@ import { UnauthorizedError } from '../lib/errors.js';
 declare module 'hono' {
   interface ContextVariableMap {
     user: User;
+    apiKey: ApiKey | null;
   }
+}
+
+export type ApiKeyScope =
+  | 'items:read'
+  | 'items:create'
+  | 'items:comment'
+  | 'items:workflow'
+  | 'items:triage'
+  | 'storage:read';
+
+export function getApiKeyScopes(apiKey: Pick<ApiKey, 'scopes'> | null | undefined): ApiKeyScope[] {
+  if (!apiKey) return [];
+  try {
+    const parsed = JSON.parse(apiKey.scopes) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((scope): scope is ApiKeyScope =>
+      scope === 'items:read' ||
+      scope === 'items:create' ||
+      scope === 'items:comment' ||
+      scope === 'items:workflow' ||
+      scope === 'items:triage' ||
+      scope === 'storage:read',
+    );
+  } catch {
+    return [];
+  }
+}
+
+async function authenticateApiKey(token: string): Promise<{ apiKey: ApiKey; user: User }> {
+  const prefix = token.slice(0, 16);
+  const apiKey = db.select().from(apiKeys)
+    .where(and(
+      eq(apiKeys.keyPrefix, prefix),
+      eq(apiKeys.isActive, true),
+    )).get();
+
+  if (!apiKey) {
+    throw new UnauthorizedError('Неверный API-ключ', 'API_KEY_INVALID');
+  }
+
+  const valid = await bcrypt.compare(token, apiKey.keyHash);
+  if (!valid) {
+    throw new UnauthorizedError('Неверный API-ключ', 'API_KEY_INVALID');
+  }
+
+  if (apiKey.expiresAt && new Date(apiKey.expiresAt) < new Date()) {
+    throw new UnauthorizedError('API-ключ истёк', 'API_KEY_EXPIRED');
+  }
+
+  const user = db.select().from(users).where(eq(users.id, apiKey.userId)).get();
+  if (!user || !user.isActive) {
+    throw new UnauthorizedError('Пользователь деактивирован', 'USER_INACTIVE');
+  }
+
+  db.update(apiKeys).set({ lastUsedAt: new Date().toISOString() }).where(eq(apiKeys.id, apiKey.id)).run();
+  return { apiKey, user };
 }
 
 /**
@@ -31,6 +88,17 @@ export const storageAuth = createMiddleware(async (c, next) => {
   const token = extractToken(c);
   if (!token) throw new UnauthorizedError('Missing authentication', 'UNAUTHORIZED');
 
+  if (token.startsWith('sk_live_')) {
+    const { apiKey, user } = await authenticateApiKey(token);
+    if (!getApiKeyScopes(apiKey).includes('storage:read')) {
+      throw new UnauthorizedError('API key cannot access storage', 'API_KEY_INVALID');
+    }
+    c.set('user', user);
+    c.set('apiKey', apiKey);
+    await next();
+    return;
+  }
+
   let payload;
   try {
     payload = verifyToken(token);
@@ -42,6 +110,7 @@ export const storageAuth = createMiddleware(async (c, next) => {
   if (!user || !user.isActive) throw new UnauthorizedError('User not found or inactive', 'USER_INACTIVE');
 
   c.set('user', user);
+  c.set('apiKey', null);
   await next();
 });
 
@@ -55,38 +124,10 @@ export const authMiddleware = createMiddleware(async (c, next) => {
 
   // Check for API key auth: Bearer sk_live_...
   if (token.startsWith('sk_live_')) {
-    const prefix = token.slice(0, 16);
-    const apiKey = db.select().from(apiKeys)
-      .where(and(
-        eq(apiKeys.keyPrefix, prefix),
-        eq(apiKeys.isActive, true),
-      )).get();
-
-    if (!apiKey) {
-      throw new UnauthorizedError('Неверный API-ключ', 'API_KEY_INVALID');
-    }
-
-    // Verify full key via bcrypt
-    const valid = await bcrypt.compare(token, apiKey.keyHash);
-    if (!valid) {
-      throw new UnauthorizedError('Неверный API-ключ', 'API_KEY_INVALID');
-    }
-
-    // Check expiry
-    if (apiKey.expiresAt && new Date(apiKey.expiresAt) < new Date()) {
-      throw new UnauthorizedError('API-ключ истёк', 'API_KEY_EXPIRED');
-    }
-
-    // Load user
-    const user = db.select().from(users).where(eq(users.id, apiKey.userId)).get();
-    if (!user || !user.isActive) {
-      throw new UnauthorizedError('Пользователь деактивирован', 'USER_INACTIVE');
-    }
-
-    // Update last used (fire-and-forget, don't block response)
-    db.update(apiKeys).set({ lastUsedAt: new Date().toISOString() }).where(eq(apiKeys.id, apiKey.id)).run();
+    const { apiKey, user } = await authenticateApiKey(token);
 
     c.set('user', user);
+    c.set('apiKey', apiKey);
     await next();
     return;
   }
@@ -105,5 +146,6 @@ export const authMiddleware = createMiddleware(async (c, next) => {
   }
 
   c.set('user', user);
+  c.set('apiKey', null);
   await next();
 });

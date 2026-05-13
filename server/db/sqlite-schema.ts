@@ -189,10 +189,13 @@ const TABLE_SPECS: TableSpec[] = [
       project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       name TEXT NOT NULL,
+      purpose TEXT NOT NULL DEFAULT 'custom',
+      scopes TEXT NOT NULL DEFAULT '["items:read","items:create","items:comment","items:workflow","items:triage","storage:read"]',
       key_hash TEXT NOT NULL,
       key_prefix TEXT NOT NULL,
       last_used_at TEXT,
       expires_at TEXT,
+      revoked_at TEXT,
       is_active INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
@@ -200,7 +203,7 @@ const TABLE_SPECS: TableSpec[] = [
       'CREATE INDEX idx_api_keys_prefix ON api_keys(key_prefix)',
       'CREATE INDEX idx_api_keys_project ON api_keys(project_id)',
     ],
-    copyColumns: ['id', 'project_id', 'user_id', 'name', 'key_hash', 'key_prefix', 'last_used_at', 'expires_at', 'is_active', 'created_at'],
+    copyColumns: ['id', 'project_id', 'user_id', 'name', 'purpose', 'scopes', 'key_hash', 'key_prefix', 'last_used_at', 'expires_at', 'revoked_at', 'is_active', 'created_at'],
     primaryKey: ['id'],
   },
 ];

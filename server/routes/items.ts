@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { eq, and, desc, count, like, or } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { scoutItems, scoutItemNotes, scoutItemLinks, projects, users, type ScoutItemLink } from '../db/schema.js';
+import { scoutItems, scoutItemNotes, scoutItemLinks, projects, users, type ApiKey, type ScoutItemLink } from '../db/schema.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { checkProjectAccess, hasProjectPermission, requireProjectPermission } from '../middleware/permissions.js';
 import { randomUUID } from 'node:crypto';
@@ -38,10 +38,10 @@ function enrichItem(item: typeof scoutItems.$inferSelect) {
   };
 }
 
-function getItemPermissions(item: typeof scoutItems.$inferSelect, user: typeof users.$inferSelect) {
-  const canWorkflow = hasProjectPermission(user.id, user.role, item.projectId, 'workflow');
-  const canTriage = hasProjectPermission(user.id, user.role, item.projectId, 'triage');
-  const canComment = hasProjectPermission(user.id, user.role, item.projectId, 'comment');
+function getItemPermissions(item: typeof scoutItems.$inferSelect, user: typeof users.$inferSelect, apiKey: ApiKey | null) {
+  const canWorkflow = hasProjectPermission(user.id, user.role, item.projectId, 'workflow', apiKey);
+  const canTriage = hasProjectPermission(user.id, user.role, item.projectId, 'triage', apiKey);
+  const canComment = hasProjectPermission(user.id, user.role, item.projectId, 'comment', apiKey);
   const canCancelOwnNew = item.status === 'new' && item.reporterId === user.id && canComment;
   return {
     canClaim: item.status === 'new' && canWorkflow,
@@ -99,7 +99,7 @@ export const itemRoutes = new Hono()
       const project = db.select().from(projects).where(eq(projects.id, data.projectId)).get();
       if (!project) throw new NotFoundError('Project', 'PROJECT_NOT_FOUND');
 
-      requireProjectPermission(user.id, user.role, data.projectId, 'create_item');
+      requireProjectPermission(user.id, user.role, data.projectId, 'create_item', c.get('apiKey'));
 
       const item = createItem({ ...data, reporterId: user.id });
       logAudit({ userId: user.id, action: 'create_item', entityType: 'item', entityId: item.id, details: { projectId: data.projectId, priority: data.priority }, ipAddress: getClientIp(c) });
@@ -116,7 +116,7 @@ export const itemRoutes = new Hono()
       const user = c.get('user');
 
       // Check project access
-      if (!checkProjectAccess(user.id, user.role, projectId)) {
+      if (!checkProjectAccess(user.id, user.role, projectId, c.get('apiKey'))) {
         throw new ForbiddenError('Нет доступа к этому проекту', 'NO_PROJECT_ACCESS');
       }
 
@@ -159,7 +159,7 @@ export const itemRoutes = new Hono()
       if (!item) throw new NotFoundError('Item', 'ITEM_NOT_FOUND');
 
       const user = c.get('user');
-      if (!checkProjectAccess(user.id, user.role, item.projectId)) {
+      if (!checkProjectAccess(user.id, user.role, item.projectId, c.get('apiKey'))) {
         throw new ForbiddenError('Нет доступа к этому проекту', 'NO_PROJECT_ACCESS');
       }
 
@@ -173,7 +173,7 @@ export const itemRoutes = new Hono()
         userName: getUserName(n.userId),
       }));
 
-      return c.json({ data: { ...enrichItem(item), notes: enrichedNotes, relatedItems: getRelatedItems(id), permissions: getItemPermissions(item, user) } });
+      return c.json({ data: { ...enrichItem(item), notes: enrichedNotes, relatedItems: getRelatedItems(id), permissions: getItemPermissions(item, user, c.get('apiKey')) } });
     })
 
   // COUNT — all roles
@@ -184,7 +184,7 @@ export const itemRoutes = new Hono()
       const user = c.get('user');
 
       // Check project access
-      if (!checkProjectAccess(user.id, user.role, projectId)) {
+      if (!checkProjectAccess(user.id, user.role, projectId, c.get('apiKey'))) {
         throw new ForbiddenError('Нет доступа к этому проекту', 'NO_PROJECT_ACCESS');
       }
       const statuses = ['new', 'in_progress', 'review', 'done', 'cancelled'] as const;
@@ -210,7 +210,7 @@ export const itemRoutes = new Hono()
       // Check project access via item's projectId
       const existing = db.select({ projectId: scoutItems.projectId }).from(scoutItems).where(eq(scoutItems.id, id)).get();
       if (!existing) throw new NotFoundError('Item', 'ITEM_NOT_FOUND');
-      requireProjectPermission(user.id, user.role, existing.projectId, 'workflow');
+      requireProjectPermission(user.id, user.role, existing.projectId, 'workflow', c.get('apiKey'));
 
       const item = claimItem(id, user);
       logAudit({ userId: user.id, action: 'claim_item', entityType: 'item', entityId: id, ipAddress: getClientIp(c) });
@@ -229,7 +229,7 @@ export const itemRoutes = new Hono()
       // Check project access via item's projectId
       const existing = db.select({ projectId: scoutItems.projectId }).from(scoutItems).where(eq(scoutItems.id, id)).get();
       if (!existing) throw new NotFoundError('Item', 'ITEM_NOT_FOUND');
-      requireProjectPermission(user.id, user.role, existing.projectId, 'workflow');
+      requireProjectPermission(user.id, user.role, existing.projectId, 'workflow', c.get('apiKey'));
 
       const oldStatus = db.select({ status: scoutItems.status }).from(scoutItems).where(eq(scoutItems.id, id)).get()?.status ?? 'new';
       const item = updateItemStatus(id, 'done', user, {
@@ -251,9 +251,9 @@ export const itemRoutes = new Hono()
       // Check project access via item's projectId
       const existing = db.select().from(scoutItems).where(eq(scoutItems.id, id)).get();
       if (!existing) throw new NotFoundError('Item', 'ITEM_NOT_FOUND');
-      const canCancelOwnNew = existing.status === 'new' && existing.reporterId === user.id && hasProjectPermission(user.id, user.role, existing.projectId, 'comment');
+      const canCancelOwnNew = existing.status === 'new' && existing.reporterId === user.id && hasProjectPermission(user.id, user.role, existing.projectId, 'comment', c.get('apiKey'));
       if (!canCancelOwnNew) {
-        requireProjectPermission(user.id, user.role, existing.projectId, 'triage');
+        requireProjectPermission(user.id, user.role, existing.projectId, 'triage', c.get('apiKey'));
       }
 
       const oldStatus = db.select({ status: scoutItems.status }).from(scoutItems).where(eq(scoutItems.id, id)).get()?.status ?? 'new';
@@ -274,7 +274,7 @@ export const itemRoutes = new Hono()
       // Check project access via item's projectId
       const existing = db.select({ projectId: scoutItems.projectId }).from(scoutItems).where(eq(scoutItems.id, id)).get();
       if (!existing) throw new NotFoundError('Item', 'ITEM_NOT_FOUND');
-      requireProjectPermission(user.id, user.role, existing.projectId, 'workflow');
+      requireProjectPermission(user.id, user.role, existing.projectId, 'workflow', c.get('apiKey'));
 
       const oldStatus = db.select({ status: scoutItems.status }).from(scoutItems).where(eq(scoutItems.id, id)).get()?.status ?? 'new';
       const item = updateItemStatus(id, status, user, {
@@ -296,7 +296,7 @@ export const itemRoutes = new Hono()
       // Check project access via item's projectId
       const existing = db.select({ projectId: scoutItems.projectId }).from(scoutItems).where(eq(scoutItems.id, id)).get();
       if (!existing) throw new NotFoundError('Item', 'ITEM_NOT_FOUND');
-      requireProjectPermission(user.id, user.role, existing.projectId, 'triage');
+      requireProjectPermission(user.id, user.role, existing.projectId, 'triage', c.get('apiKey'));
 
       deleteItem(id);
       logAudit({ userId: user.id, action: 'delete_item', entityType: 'item', entityId: id, ipAddress: getClientIp(c) });
@@ -315,7 +315,7 @@ export const itemRoutes = new Hono()
       // Check project access via item's projectId
       const existing = db.select({ projectId: scoutItems.projectId }).from(scoutItems).where(eq(scoutItems.id, data.id)).get();
       if (!existing) throw new NotFoundError('Item', 'ITEM_NOT_FOUND');
-      requireProjectPermission(user.id, user.role, existing.projectId, 'triage');
+      requireProjectPermission(user.id, user.role, existing.projectId, 'triage', c.get('apiKey'));
 
       const item = updateItem(data.id, {
         message: data.message,
@@ -338,7 +338,7 @@ export const itemRoutes = new Hono()
       // Check project access via item's projectId
       const existing = db.select({ projectId: scoutItems.projectId }).from(scoutItems).where(eq(scoutItems.id, id)).get();
       if (!existing) throw new NotFoundError('Item', 'ITEM_NOT_FOUND');
-      requireProjectPermission(user.id, user.role, existing.projectId, 'triage');
+      requireProjectPermission(user.id, user.role, existing.projectId, 'triage', c.get('apiKey'));
 
       const oldStatus = db.select({ status: scoutItems.status }).from(scoutItems).where(eq(scoutItems.id, id)).get()?.status ?? 'done';
       const item = reopenItem(id, user);
@@ -359,7 +359,7 @@ export const itemRoutes = new Hono()
       const item = db.select().from(scoutItems).where(eq(scoutItems.id, itemId)).get();
       if (!item) throw new NotFoundError('Item', 'ITEM_NOT_FOUND');
 
-      requireProjectPermission(user.id, user.role, item.projectId, 'comment');
+      requireProjectPermission(user.id, user.role, item.projectId, 'comment', c.get('apiKey'));
 
       const id = randomUUID();
       db.insert(scoutItemNotes).values({
@@ -389,7 +389,7 @@ export const itemRoutes = new Hono()
       if (source.projectId !== target.projectId) {
         return c.json({ error: 'Items must belong to the same project', code: 'VALIDATION_FAILED' }, 400);
       }
-      requireProjectPermission(user.id, user.role, source.projectId, 'workflow');
+      requireProjectPermission(user.id, user.role, source.projectId, 'workflow', c.get('apiKey'));
 
       const normalized = normalizeLinkPair(data.sourceItemId, data.targetItemId, data.type);
       const existing = db.select().from(scoutItemLinks)
@@ -431,7 +431,7 @@ export const itemRoutes = new Hono()
       const target = db.select().from(scoutItems).where(eq(scoutItems.id, link.targetItemId)).get();
       const projectId = source?.projectId ?? target?.projectId;
       if (!projectId) throw new NotFoundError('Item', 'ITEM_NOT_FOUND');
-      requireProjectPermission(user.id, user.role, projectId, 'workflow');
+      requireProjectPermission(user.id, user.role, projectId, 'workflow', c.get('apiKey'));
 
       db.delete(scoutItemLinks).where(eq(scoutItemLinks.id, id)).run();
       logAudit({ userId: user.id, action: 'unlink_item', entityType: 'item', entityId: link.sourceItemId, details: { targetItemId: link.targetItemId, type: link.type }, ipAddress: getClientIp(c) });
