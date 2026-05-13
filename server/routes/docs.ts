@@ -19,9 +19,9 @@ const spec = {
     { name: 'Auth', description: 'Аутентификация и валидация токенов' },
     { name: 'Items', description: 'Баг-репорты (создание, управление статусами, заметки)' },
     { name: 'Projects', description: 'Управление проектами' },
-    { name: 'Users', description: 'Управление пользователями (только admin)' },
-    { name: 'Webhooks', description: 'Вебхуки для интеграций (только admin)' },
-    { name: 'API Keys', description: 'API-ключи для программного доступа (только admin)' },
+    { name: 'Users', description: 'Управление пользователями и project roles' },
+    { name: 'Webhooks', description: 'Вебхуки для проектных интеграций' },
+    { name: 'API Keys', description: 'Project-scoped API keys для программного доступа' },
     { name: 'Events', description: 'Server-Sent Events (SSE) для real-time обновлений' },
     { name: 'Health', description: 'Проверка состояния сервера' },
     { name: 'Docs', description: 'Документация API' },
@@ -352,6 +352,36 @@ const spec = {
                     data: {
                       type: 'object',
                       properties: {
+                        user: { $ref: '#/components/schemas/User' },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          401: { description: 'Не авторизован', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+        },
+      },
+    },
+    '/auth/refresh': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Обновить JWT',
+        description: 'Возвращает новый JWT-токен и актуальные данные текущего авторизованного пользователя.',
+        security: [{ BearerAuth: [] }],
+        responses: {
+          200: {
+            description: 'Токен обновлён',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    data: {
+                      type: 'object',
+                      properties: {
+                        token: { type: 'string' },
                         user: { $ref: '#/components/schemas/User' },
                       },
                     },
@@ -1279,7 +1309,7 @@ const spec = {
       post: {
         tags: ['Webhooks'],
         summary: 'Создать вебхук',
-        description: 'Создаёт webhook для проекта. Требуется project permission `manage_integrations` (admin/owner).',
+        description: 'Создаёт webhook для проекта. Требуется project permission `manage_integrations` (admin/owner/manager).',
         security: [{ BearerAuth: [] }, { ApiKeyAuth: [] }],
         requestBody: {
           required: true,
@@ -1316,7 +1346,7 @@ const spec = {
       post: {
         tags: ['Webhooks'],
         summary: 'Список вебхуков',
-        description: 'Список вебхуков проекта. Требуется project permission `manage_integrations` (admin/owner).',
+        description: 'Список вебхуков проекта. Требуется project permission `manage_integrations` (admin/owner/manager).',
         security: [{ BearerAuth: [] }, { ApiKeyAuth: [] }],
         requestBody: {
           required: true,
@@ -1359,7 +1389,7 @@ const spec = {
       post: {
         tags: ['Webhooks'],
         summary: 'Обновить вебхук',
-        description: 'Обновляет настройки webhook. Требуется project permission `manage_integrations` (admin/owner).',
+        description: 'Обновляет настройки webhook. Требуется project permission `manage_integrations` (admin/owner/manager).',
         security: [{ BearerAuth: [] }, { ApiKeyAuth: [] }],
         requestBody: {
           required: true,
@@ -1397,7 +1427,7 @@ const spec = {
       post: {
         tags: ['Webhooks'],
         summary: 'Удалить вебхук',
-        description: 'Удаляет webhook. Требуется project permission `manage_integrations` (admin/owner).',
+        description: 'Удаляет webhook. Требуется project permission `manage_integrations` (admin/owner/manager).',
         security: [{ BearerAuth: [] }, { ApiKeyAuth: [] }],
         requestBody: {
           required: true,
@@ -1431,7 +1461,7 @@ const spec = {
       post: {
         tags: ['Webhooks'],
         summary: 'Тест вебхука',
-        description: 'Отправляет тестовый payload на URL вебхука. Требуется project permission `manage_integrations` (admin/owner).',
+        description: 'Отправляет тестовый payload на URL вебхука. Требуется project permission `manage_integrations` (admin/owner/manager).',
         security: [{ BearerAuth: [] }, { ApiKeyAuth: [] }],
         requestBody: {
           required: true,

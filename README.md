@@ -86,7 +86,7 @@ pnpm dev:all     # API + dashboard + widget (hot reload)
 <script src="https://your-scout.example/widget/scout-widget.js" async></script>
 ```
 
-The dashboard shows a ready-to-copy snippet for each project on the **Projects** page.
+The dashboard shows a ready-to-copy snippet for each project under **Projects** → **Manage integrations**.
 
 **What it captures:** CSS selector, element text/HTML, page URL, viewport size, browser/OS metadata, screenshot (with element highlight), session recording (last 60 seconds).
 
@@ -107,7 +107,7 @@ The dashboard shows a ready-to-copy snippet for each project on the **Projects**
 Responsive React SPA served from the same port as the API.
 
 - **Items** — List with status/priority filters, search, pagination. Detail view with screenshot lightbox, rrweb session player, notes timeline, related items, resolve modal
-- **Projects** — CRUD with allowed origins for CORS/SSO and ready-to-copy widget snippets
+- **Projects** — CRUD with allowed origins for CORS/SSO and links to per-project integrations
 - **Users** — CRUD with system roles and per-project role assignment
 - **Webhooks** — Per-project event notifications (Slack-compatible)
 - **Language** — Switcher in sidebar (RU / EN / UZ)
