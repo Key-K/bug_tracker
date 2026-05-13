@@ -15,6 +15,7 @@ This is not a daemon workflow. Do not poll Scout, run a background loop, or proc
 
 - Treat the Scout item as the contract, but verify the real behavior before changing code.
 - Own the item end-to-end: triage, reproduce, diagnose, fix, verify, communicate, and hand off.
+- Treat the user as the reviewer/approver, not the workflow operator. Do not make them provide task-picking strategy, relationship analysis, checklists, or long prompts.
 - Short user commands such as "сделай следующую задачу из Скаута" are complete instructions: choose the best next actionable Scout item and execute the full workflow autonomously.
 - Do not require the user to spell out prioritization, verification, or Scout update rules; apply this skill's workflow by default.
 - Keep scope tight. Fix the reported bug or requested improvement, not nearby problems.
@@ -22,6 +23,26 @@ This is not a daemon workflow. Do not poll Scout, run a background loop, or proc
 - If the item is unclear, ask a precise question in Scout instead of inventing requirements.
 - Keep Scout updated at meaningful milestones, not with noisy step logs.
 - Preserve all existing local and repo-specific rules, especially `AGENTS.md`, test/build commands, design system rules, and deployment safety rules.
+
+## Autonomy Boundary
+
+Handle routine engineering decisions without asking the user:
+
+- choose the next actionable item when no item id is provided;
+- classify and prioritize the item;
+- decide whether to claim it now or leave it with a question/blocker;
+- search for duplicates, related items, blockers, conflicts, and shared root causes;
+- create evidence-backed Scout links and notes;
+- choose the minimal code path, tests, runtime checks, and browser checks;
+- update Scout status when the Definition of Done supports it.
+
+Ask the user only for real blockers:
+
+- missing access or credentials;
+- destructive or irreversible action;
+- product decision with incompatible requirements;
+- external dependency outside the available repo/services;
+- acceptance/deploy decision when the workflow requires human approval.
 
 ## Configuration
 
@@ -70,7 +91,7 @@ Recommended selection order:
 
 ## Related Items And Duplicate Work
 
-Before implementing a fix, look for related Scout items so one root-cause fix can close the whole cluster when appropriate.
+Before implementing a fix, proactively look for related Scout items so one root-cause fix can close the whole cluster when appropriate. Do not wait for the user to ask for dependency analysis.
 
 Search for related items by:
 
@@ -86,17 +107,21 @@ Classify relationships explicitly:
 - Duplicate: same symptom, same expected behavior, same root cause likely.
 - Shared root cause: different symptoms caused by the same code path or data issue.
 - Related but separate: same area, different cause or expected behavior.
+- Blocks / blocked by: one item cannot be completed or verified until another item is handled.
+- Caused by: the current item appears to be a regression or side effect of another tracked change.
 - Conflicting: items request incompatible behavior and need a product decision.
 
 Rules for handling clusters:
 
 1. Do not blindly merge bugs by similar wording. Confirm with evidence.
-2. If one fix likely resolves multiple items, choose a primary item and mention related item ids in Scout notes.
-3. Keep the code change cohesive. One PR may address a cluster only when the root cause and verification are shared.
-4. If related items need different fixes, split the work and explain why.
-5. After fixing, verify each related item's acceptance condition before moving it to `review` or `done`.
-6. When closing/handing off multiple items, add a note to each item that links the shared branch/PR and explains why it is covered.
-7. If items conflict, stop and ask a product/owner question in Scout instead of choosing arbitrarily.
+2. Create Scout links yourself when evidence supports a relationship: `duplicate`, `related`, `blocks`, `blocked_by`, `caused_by`, or `conflicts`.
+3. If one fix likely resolves multiple items, choose a primary item and mention related item ids in Scout notes.
+4. Keep the code change cohesive. One PR may address a cluster only when the root cause and verification are shared.
+5. If related items need different fixes, split the work and explain why.
+6. After fixing, verify each related item's acceptance condition before moving it to `review` or `done`.
+7. When closing/handing off multiple items, add a note to each item that links the shared branch/PR and explains why it is covered.
+8. If items conflict, link them as `conflicts`, stop, and ask a product/owner question in Scout instead of choosing arbitrarily.
+9. If no related items are found, say that in the completion note so the absence of links is intentional.
 
 ## Triage
 
