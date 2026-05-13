@@ -18,6 +18,7 @@
   "common.prev": "Назад",
   "common.next": "Вперёд",
   "common.search": "Поиск",
+  "common.clear": "Очистить",
   "common.create": "Создать",
   "common.actions": "Действия",
 
@@ -26,6 +27,7 @@
   "nav.webhooks": "Вебхуки",
   "nav.users": "Пользователи",
   "nav.profile": "Профиль",
+  "nav.sourceCode": "Исходный код Scout",
   "nav.logout": "Выйти",
 
   "auth.title": "Scout",
@@ -131,7 +133,7 @@
   "items.detail.links.types.conflicts": "Конфликтует",
 
   "projects.title": "Проекты",
-  "projects.description": "Управление проектами и источниками",
+  "projects.description": "Управление проектами и разрешёнными источниками",
   "projects.create": "Создать проект",
   "projects.table.name": "Название",
   "projects.table.slug": "Слаг",
@@ -164,8 +166,10 @@
   "users.form.password": "Пароль",
   "users.form.passwordHint": "Оставьте пустым, чтобы не менять",
   "users.form.role": "Роль",
+  "users.form.roleHint": "Системная роль задаёт общий доступ, роли ниже — права внутри проектов.",
   "users.form.active": "Активен",
   "users.form.projects": "Проекты",
+  "users.form.projectsHint": "Выберите проекты, которые пользователь видит, и его ответственность в каждом.",
   "users.roles.admin": "Админ",
   "users.roles.member": "Участник",
   "users.roles.agent": "Агент",
@@ -188,6 +192,7 @@
   "webhooks.table.active": "Активен",
   "webhooks.table.actions": "Действия",
   "webhooks.form.url": "URL",
+  "webhooks.form.urlHint": "Scout отправляет выбранные события проекта на этот endpoint в JSON.",
   "webhooks.form.events": "События",
   "webhooks.form.hmacSecret": "HMAC Secret",
   "webhooks.form.hmacOptional": "опционально",

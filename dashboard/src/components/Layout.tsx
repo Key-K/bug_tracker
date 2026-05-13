@@ -5,6 +5,8 @@ import { api } from '../lib/api';
 import { useSSE, type SSEEventType } from '../hooks/useSSE';
 import { useTranslation, LOCALE_LABELS, type Locale } from '../i18n';
 
+const SCOUT_REPOSITORY_URL = 'https://github.com/scout-dev-org/scout';
+
 export default function Layout() {
   const user = getUser();
   const admin = isAdmin();
@@ -163,6 +165,14 @@ export default function Layout() {
           <div className="mt-2">
             {localeSwitcher}
           </div>
+          <a
+            href={SCOUT_REPOSITORY_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-3 inline-flex text-xs text-gray-500 hover:text-gray-800 hover:underline"
+          >
+            {t('nav.sourceCode')}
+          </a>
         </div>
       </aside>
 
@@ -200,6 +210,14 @@ export default function Layout() {
             <div className="mb-4">
               {localeSwitcher}
             </div>
+            <a
+              href={SCOUT_REPOSITORY_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="mb-3 block rounded-md border border-gray-200 px-4 py-2.5 text-center text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              {t('nav.sourceCode')}
+            </a>
             <button
               onClick={logout}
               className="w-full rounded-md border border-red-200 px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50"

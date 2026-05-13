@@ -335,6 +335,7 @@ export default function Projects() {
               <span className="text-sm font-medium text-gray-700">{t('projects.form.name')}</span>
               <input
                 type="text"
+                name="project-name"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 required
@@ -347,6 +348,7 @@ export default function Projects() {
                 <span className="text-sm font-medium text-gray-700">{t('projects.form.slug')}</span>
                 <input
                   type="text"
+                  name="project-slug"
                   value={form.slug}
                   onChange={(e) => setForm({ ...form, slug: e.target.value })}
                   required
@@ -365,6 +367,7 @@ export default function Projects() {
                   <div key={idx} className="flex items-center gap-2">
                     <input
                       type="url"
+                      name={`project-origin-${idx}`}
                       value={origin}
                       onChange={(e) => {
                         const updated = [...form.allowedOrigins];
@@ -387,6 +390,7 @@ export default function Projects() {
                         }}
                         className="shrink-0 rounded-md p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500"
                         title={t('common.delete')}
+                        aria-label={t('common.delete')}
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
                           <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />

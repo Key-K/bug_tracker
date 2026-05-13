@@ -222,6 +222,7 @@ export default function Items() {
           <p className="mt-1 text-sm text-gray-500">{t('items.description')}</p>
         </div>
         <select
+          name="items-project"
           value={selectedProject}
           onChange={handleProjectChange}
           className="w-full md:w-auto rounded-md border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
@@ -233,12 +234,12 @@ export default function Items() {
           ))}
         </select>
       </div>
-
       {/* Search + assignee filter */}
       <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
         <div className="relative flex-1">
           <input
             type="text"
+            name="items-search"
             value={searchInput}
             onChange={(e) => handleSearchInput(e.target.value)}
             placeholder={t('items.filters.searchPlaceholder')}
@@ -247,6 +248,7 @@ export default function Items() {
           {searchInput && (
             <button
               onClick={clearSearch}
+              aria-label={t('common.clear')}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
               type="button"
             >
@@ -257,6 +259,7 @@ export default function Items() {
           )}
         </div>
         <select
+          name="items-priority"
           value={priorityFilter}
           onChange={handlePriorityFilter}
           className="w-full md:w-44 rounded-md border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
@@ -269,6 +272,7 @@ export default function Items() {
         </select>
         {admin && teamUsers.length > 0 && (
           <select
+            name="items-assignee"
             value={assigneeFilter}
             onChange={handleAssigneeFilter}
             className="w-full md:w-48 rounded-md border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"

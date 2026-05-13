@@ -401,6 +401,7 @@ export default function Users() {
 
             <label className="mt-3 block">
               <span className="text-sm font-medium text-gray-700">{t('users.form.role')}</span>
+              <p className="mt-0.5 text-xs text-gray-500">{t('users.form.roleHint')}</p>
               <select
                 value={form.role}
                 onChange={(e) =>
@@ -437,6 +438,7 @@ export default function Users() {
                 <span className="text-sm font-medium text-gray-700">
                   {t('users.form.projects')}
                 </span>
+                <p className="mt-0.5 text-xs text-gray-500">{t('users.form.projectsHint')}</p>
                 <div className="mt-1 max-h-36 space-y-1 overflow-y-auto rounded-md border border-gray-200 p-2">
                   {projects.map((p) => {
                     const enabled = form.projectRoles.some((role) => role.projectId === p.id);

@@ -18,6 +18,7 @@
   "common.prev": "Oldingi",
   "common.next": "Keyingi",
   "common.search": "Qidirish",
+  "common.clear": "Tozalash",
   "common.create": "Yaratish",
   "common.actions": "Harakatlar",
 
@@ -26,6 +27,7 @@
   "nav.webhooks": "Vebhuklar",
   "nav.users": "Foydalanuvchilar",
   "nav.profile": "Profil",
+  "nav.sourceCode": "Scout manba kodi",
   "nav.logout": "Chiqish",
 
   "auth.title": "Scout",
@@ -131,7 +133,7 @@
   "items.detail.links.types.conflicts": "Zid keladi",
 
   "projects.title": "Loyihalar",
-  "projects.description": "Loyihalar va manbalarni boshqarish",
+  "projects.description": "Loyihalar va ruxsat etilgan brauzer manbalarini boshqarish",
   "projects.create": "Loyiha yaratish",
   "projects.table.name": "Nomi",
   "projects.table.slug": "Slag",
@@ -164,8 +166,10 @@
   "users.form.password": "Parol",
   "users.form.passwordHint": "O'zgartirmaslik uchun bo'sh qoldiring",
   "users.form.role": "Rol",
+  "users.form.roleHint": "Tizim roli umumiy kirishni, quyidagi loyiha rollari esa har bir loyiha huquqlarini belgilaydi.",
   "users.form.active": "Faol",
   "users.form.projects": "Loyihalar",
+  "users.form.projectsHint": "Foydalanuvchi ko'ra oladigan loyihalarni va har biridagi mas'uliyatini tanlang.",
   "users.roles.admin": "Admin",
   "users.roles.member": "A'zo",
   "users.roles.agent": "Agent",
@@ -188,6 +192,7 @@
   "webhooks.table.active": "Faol",
   "webhooks.table.actions": "Harakatlar",
   "webhooks.form.url": "URL",
+  "webhooks.form.urlHint": "Scout tanlangan loyiha hodisalarini shu endpointga JSON shaklida yuboradi.",
   "webhooks.form.events": "Hodisalar",
   "webhooks.form.hmacSecret": "HMAC Secret",
   "webhooks.form.hmacOptional": "ixtiyoriy",

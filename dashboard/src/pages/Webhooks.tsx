@@ -370,12 +370,14 @@ export default function Webhooks() {
               <span className="text-sm font-medium text-gray-700">{t('webhooks.form.url')}</span>
               <input
                 type="url"
+                name="webhook-url"
                 value={form.url}
                 onChange={(e) => setForm({ ...form, url: e.target.value })}
                 required
                 placeholder="https://hooks.slack.com/services/..."
                 className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono"
               />
+              <p className="mt-1 text-xs text-gray-500">{t('webhooks.form.urlHint')}</p>
             </label>
 
             <label className="mt-3 block">
@@ -384,6 +386,7 @@ export default function Webhooks() {
               </span>
               <input
                 type="text"
+                name="webhook-hmac-secret"
                 value={form.secret}
                 onChange={(e) => setForm({ ...form, secret: e.target.value })}
                 placeholder="your-secret-key"

@@ -18,6 +18,7 @@
   "common.prev": "Previous",
   "common.next": "Next",
   "common.search": "Search",
+  "common.clear": "Clear",
   "common.create": "Create",
   "common.actions": "Actions",
 
@@ -26,6 +27,7 @@
   "nav.webhooks": "Webhooks",
   "nav.users": "Users",
   "nav.profile": "Profile",
+  "nav.sourceCode": "Scout source code",
   "nav.logout": "Log out",
 
   "auth.title": "Scout",
@@ -131,7 +133,7 @@
   "items.detail.links.types.conflicts": "Conflicts",
 
   "projects.title": "Projects",
-  "projects.description": "Manage projects and origins",
+  "projects.description": "Manage projects and allowed browser origins",
   "projects.create": "Create project",
   "projects.table.name": "Name",
   "projects.table.slug": "Slug",
@@ -164,8 +166,10 @@
   "users.form.password": "Password",
   "users.form.passwordHint": "Leave empty to keep current",
   "users.form.role": "Role",
+  "users.form.roleHint": "System role controls product-wide access; project roles below control each project.",
   "users.form.active": "Active",
   "users.form.projects": "Projects",
+  "users.form.projectsHint": "Choose the projects this user can see, then assign their responsibility in each one.",
   "users.roles.admin": "Admin",
   "users.roles.member": "Member",
   "users.roles.agent": "Agent",
@@ -188,6 +192,7 @@
   "webhooks.table.active": "Active",
   "webhooks.table.actions": "Actions",
   "webhooks.form.url": "URL",
+  "webhooks.form.urlHint": "Scout sends selected project events to this endpoint as JSON.",
   "webhooks.form.events": "Events",
   "webhooks.form.hmacSecret": "HMAC Secret",
   "webhooks.form.hmacOptional": "optional",
