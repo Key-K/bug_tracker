@@ -305,7 +305,6 @@ describe('Items routes', () => {
       name: 'Other Project',
       slug: 'other-project',
       allowedOrigins: '[]',
-      autofixEnabled: false,
     }).run();
     const second = await createTestItem(ctx.adminToken, otherProjectId);
 

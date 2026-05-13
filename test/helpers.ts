@@ -40,7 +40,7 @@ export function createTestContext(): TestContext {
 
   db.insert(schema.projects).values({
     id: projectId, name: 'Test Project', slug: 'test-project',
-    allowedOrigins: '["http://localhost:3000"]', autofixEnabled: true,
+    allowedOrigins: '["http://localhost:3000"]',
   }).run();
 
   db.insert(schema.users).values([

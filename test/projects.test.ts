@@ -249,17 +249,6 @@ describe('Projects routes', () => {
     expect(origins).toEqual(['http://localhost:8080', 'https://example.com']);
   });
 
-  it('POST /update — admin can update autofixEnabled', async () => {
-    const res = await post('/update', {
-      id: ctx.projectId,
-      autofixEnabled: false,
-    }, ctx.adminToken);
-
-    expect(res.status).toBe(200);
-    const body = await res.json() as any;
-    expect(body.data.autofixEnabled).toBe(false);
-  });
-
   it('POST /update — admin can update isActive', async () => {
     const res = await post('/update', {
       id: ctx.projectId,

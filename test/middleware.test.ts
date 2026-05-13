@@ -74,7 +74,6 @@ describe('Middleware', () => {
         name: 'Other Project',
         slug: 'other-project',
         allowedOrigins: '[]',
-        autofixEnabled: true,
       }).run();
       // Note: NO pivot_users_projects entries for agent/member → they should get 403
     });

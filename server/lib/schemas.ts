@@ -28,7 +28,6 @@ export const updateProjectSchema = z.object({
   id: uuidSchema,
   name: z.string().min(1).max(100).optional(),
   allowedOrigins: z.array(z.string().url()).optional(),
-  autofixEnabled: z.boolean().optional(),
   isActive: z.boolean().optional(),
 });
 

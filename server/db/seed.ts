@@ -16,7 +16,6 @@ function seed() {
       name: 'My App',
       slug: 'my-app',
       allowedOrigins: JSON.stringify(['http://localhost:3000']),
-      autofixEnabled: true,
     }).run();
     logger.info('Created project: My App');
   } else {

@@ -8,7 +8,7 @@ const spec = {
     title: 'Scout Bug Tracking API',
     version: '1.0.0',
     description:
-      'Scout — автономная система баг-трекинга с AI-агентом. Все API-эндпоинты используют метод POST с JSON-телом (кроме health, events, docs). Авторизация через Bearer JWT или API Key (`sk_live_...`).',
+      'Scout — self-hosted bug tracker for AI-assisted product teams. Все API-эндпоинты используют метод POST с JSON-телом (кроме health, events, docs). Авторизация через Bearer JWT или API Key (`sk_live_...`).',
     contact: { url: 'https://your-scout.example' },
   },
   servers: [
@@ -131,7 +131,6 @@ const spec = {
           name: { type: 'string' },
           slug: { type: 'string' },
           allowedOrigins: { type: 'string', description: 'JSON array of allowed origins' },
-          autofixEnabled: { type: 'boolean' },
           isActive: { type: 'boolean' },
           createdAt: { type: 'string', format: 'date-time' },
           updatedAt: { type: 'string', format: 'date-time' },
@@ -1038,7 +1037,6 @@ const spec = {
                   id: { type: 'string', format: 'uuid' },
                   name: { type: 'string', minLength: 1, maxLength: 100 },
                   allowedOrigins: { type: 'array', items: { type: 'string', format: 'uri' } },
-                  autofixEnabled: { type: 'boolean' },
                   isActive: { type: 'boolean' },
                 },
               },

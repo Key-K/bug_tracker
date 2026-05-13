@@ -107,7 +107,7 @@ The dashboard shows a ready-to-copy snippet for each project on the **Projects**
 Responsive React SPA served from the same port as the API.
 
 - **Items** — List with status/priority filters, search, pagination. Detail view with screenshot lightbox, rrweb session player, notes timeline, related items, resolve modal
-- **Projects** — CRUD with allowed origins for CORS/SSO, auto-fix toggle, ready-to-copy widget snippet
+- **Projects** — CRUD with allowed origins for CORS/SSO and ready-to-copy widget snippets
 - **Users** — CRUD with system roles and per-project role assignment
 - **Webhooks** — Per-project event notifications (Slack-compatible)
 - **Language** — Switcher in sidebar (RU / EN / UZ)

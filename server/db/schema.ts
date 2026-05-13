@@ -19,7 +19,6 @@ export const projects = sqliteTable('projects', {
   name: text('name').notNull(),
   slug: text('slug').unique().notNull(),
   allowedOrigins: text('allowed_origins').notNull().default('[]'), // JSON array
-  autofixEnabled: integer('autofix_enabled', { mode: 'boolean' }).notNull().default(true),
   isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
   createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
   updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),

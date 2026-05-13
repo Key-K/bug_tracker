@@ -120,7 +120,7 @@ export const projectRoutes = new Hono()
   .post('/update',
     zValidator('json', updateProjectSchema),
     async (c) => {
-      const { id, name, allowedOrigins, autofixEnabled, isActive } = c.req.valid('json');
+      const { id, name, allowedOrigins, isActive } = c.req.valid('json');
       const user = c.get('user');
 
       const existing = db.select().from(projects).where(eq(projects.id, id)).get();
@@ -132,12 +132,11 @@ export const projectRoutes = new Hono()
       };
       if (name !== undefined) updateData.name = name;
       if (allowedOrigins !== undefined) updateData.allowedOrigins = JSON.stringify(allowedOrigins);
-      if (autofixEnabled !== undefined) updateData.autofixEnabled = autofixEnabled;
       if (isActive !== undefined) updateData.isActive = isActive;
 
       db.update(projects).set(updateData).where(eq(projects.id, id)).run();
       const project = db.select().from(projects).where(eq(projects.id, id)).get()!;
-      logAudit({ userId: user.id, action: 'update_project', entityType: 'project', entityId: id, details: { name, autofixEnabled, isActive }, ipAddress: getClientIp(c) });
+      logAudit({ userId: user.id, action: 'update_project', entityType: 'project', entityId: id, details: { name, isActive }, ipAddress: getClientIp(c) });
       return c.json({ data: project });
     })
 

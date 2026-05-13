@@ -9,7 +9,6 @@ interface ProjectRaw {
   name: string;
   slug: string;
   allowedOrigins: string; // JSON string from API
-  autofixEnabled: boolean;
   isActive: boolean;
   createdAt: string;
 }
@@ -37,7 +36,6 @@ const emptyForm = {
   name: '',
   slug: '',
   allowedOrigins: [''] as string[],
-  autofixEnabled: false,
   isActive: true,
 };
 
@@ -120,7 +118,6 @@ export default function Projects() {
       name: p.name,
       slug: p.slug,
       allowedOrigins: p.allowedOrigins.length > 0 ? [...p.allowedOrigins] : [''],
-      autofixEnabled: p.autofixEnabled,
       isActive: p.isActive,
     });
     setError('');
@@ -141,7 +138,6 @@ export default function Projects() {
           id: editingId,
           name: form.name,
           allowedOrigins: origins,
-          autofixEnabled: form.autofixEnabled,
           isActive: form.isActive,
         });
       } else {
@@ -172,7 +168,7 @@ export default function Projects() {
 
   async function toggleField(
     p: Project,
-    field: 'autofixEnabled' | 'isActive',
+    field: 'isActive',
   ) {
     try {
       await api('/api/projects/update', {
@@ -209,7 +205,6 @@ export default function Projects() {
               <th className="px-4 py-3">{t('projects.table.slug')}</th>
               <th className="px-4 py-3">{t('projects.table.origins')}</th>
               <th className="px-4 py-3">{t('projects.table.widget')}</th>
-              <th className="px-4 py-3 w-24 text-center">{t('projects.table.autofix')}</th>
               <th className="px-4 py-3 w-24 text-center">{t('projects.table.active')}</th>
               <th className="px-4 py-3 w-28 text-right">{t('projects.table.actions')}</th>
             </tr>
@@ -217,13 +212,13 @@ export default function Projects() {
           <tbody className="divide-y divide-gray-100">
             {loading ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
                   {t('common.loading')}
                 </td>
               </tr>
             ) : projects.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
                   {t('common.noData')}
                 </td>
               </tr>
@@ -255,12 +250,6 @@ export default function Projects() {
                         </button>
                       </div>
                     </details>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <Toggle
-                      checked={p.autofixEnabled}
-                      onChange={() => toggleField(p, 'autofixEnabled')}
-                    />
                   </td>
                   <td className="px-4 py-3 text-center">
                     <Toggle
@@ -334,13 +323,6 @@ export default function Projects() {
               </details>
               <div className="mt-2.5 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <label className="flex items-center gap-1.5 text-xs text-gray-500">
-                    <Toggle
-                      checked={p.autofixEnabled}
-                      onChange={() => toggleField(p, 'autofixEnabled')}
-                    />
-                    {t('projects.form.autofix')}
-                  </label>
                   <label className="flex items-center gap-1.5 text-xs text-gray-500">
                     <Toggle
                       checked={p.isActive}
@@ -479,17 +461,6 @@ export default function Projects() {
 
             {editingId && (
               <div className="mt-3 flex items-center gap-4">
-                <label className="flex items-center gap-2 text-sm text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={form.autofixEnabled}
-                    onChange={(e) =>
-                      setForm({ ...form, autofixEnabled: e.target.checked })
-                    }
-                    className="rounded border-gray-300"
-                  />
-                  {t('projects.form.autofix')}
-                </label>
                 <label className="flex items-center gap-2 text-sm text-gray-700">
                   <input
                     type="checkbox"
