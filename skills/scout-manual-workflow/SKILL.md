@@ -81,7 +81,7 @@ When the user asks to work from Scout:
 
 When selecting work from a project rather than a specific item, first inspect the queue like a bug triage owner, not like a FIFO script.
 
-1. List open items across relevant statuses: `new`, `in_progress`, and `review` when appropriate.
+1. List open items across relevant statuses: `new`, `in_progress`, and `review` when appropriate. Prefer one `/api/items/list` call with `statuses` when Scout supports it; otherwise make separate status calls.
 2. Sort by severity and urgency first, then age:
    - `critical`: production outage, data loss/corruption, security/privacy issue, broken core workflow.
    - `high`: major user-visible failure, blocked important workflow, strong business impact.
@@ -156,6 +156,19 @@ For bugs, reproduce or collect the nearest practical evidence before fixing:
 
 If reproduction is impossible but the evidence is strong, say so in Scout and make the smallest evidence-backed fix.
 
+## Large Browser Or Regression Items
+
+When a Scout item asks for broad browser coverage, route sweeps, role matrices, query/params matrices, or "check everything", treat the runner as production tooling, not as ad hoc clicking.
+
+1. Build inventory first: routes, query/params, roles/auth, fixtures, destructive boundaries, and expected-negative cases.
+2. Do not run a long sweep through visible browser windows or many Playwright MCP contexts. Use a controlled headless runner when available, with one browser/page by default and explicit throttling.
+3. Write progress and results incrementally to an artifact outside the repo, and surface periodic progress only when it changes the user's understanding.
+4. Keep the runner below app rate limits. If a broad sweep creates `429` noise, slow down and rerun affected batches instead of treating the raw failures as findings.
+5. Classify expected negatives before reporting: invalid-token `403`, missing required params, intentional redirects, allowed third-party/widget noise, navigation `ERR_ABORTED`, and known local-dev warnings are not automatically regressions.
+6. For any suspicious failure, run a small targeted repro after the sweep. Report confirmed findings, not raw sweep counts.
+7. Do not execute destructive or mass-write form actions without explicit permission and disposable local fixtures. Mark only those cases blocked; do not let them block read-only route coverage.
+8. If browser tooling itself fails, diagnose the runner separately from the application and say which evidence is invalidated.
+
 ## Implementation
 
 1. Work in the current local repository unless the user explicitly points elsewhere.
@@ -165,6 +178,16 @@ If reproduction is impossible but the evidence is strong, say so in Scout and ma
 5. Avoid broad refactors, dependency churn, formatting sweeps, or unrelated cleanup.
 6. Preserve public/private boundaries and never add secrets to tracked files.
 7. Follow existing project conventions over generic preferences.
+
+## Commit And Handoff
+
+For completed code changes from a Scout item, create a focused git commit after final verification unless the user explicitly says not to commit or the repository policy forbids commits.
+
+1. Commit only the files that belong to the Scout item. Do not include unrelated local changes, generated secrets, local env files, private runbooks, or incidental reports.
+2. Keep the commit message in the repository's required language. When working in this Scout repository, commit messages are English.
+3. Include a durable Scout reference in the commit body, for example `Scout-Item: <SCOUT_ITEM_URL_OR_ID>`. If a project uses issue-style refs, follow that existing convention.
+4. Do not push unless the user or repo workflow explicitly asks for push.
+5. After the commit succeeds, update Scout with the branch name and commit hash or PR URL. If the commit cannot be created, explain the exact blocker in Scout and do not mark the item ready for review.
 
 ## Communication In Scout
 
@@ -178,7 +201,13 @@ Use Scout notes for durable, useful communication:
 - Handoff: link branch/commit/PR and summarize the fix.
 - Failure: explain why it cannot be completed and what evidence exists.
 
-Avoid noisy command transcripts, huge stack traces, private local paths unless necessary, secrets, speculative claims, or “still working” chatter.
+Write Scout notes in Russian by default, unless the Scout item or project explicitly uses another language. Keep them clear enough that a reviewer can understand what happened without reading the chat: what was done, why, how it was verified, what changed in status, and what remains. Avoid noisy command transcripts, huge stack traces, private local paths unless necessary, secrets, speculative claims, or “still working” chatter.
+
+Minimum useful Scout updates:
+
+1. Start note before active work: коротко что берёшь, как понял задачу, где будешь работать.
+2. Root-cause note when known: фактическая причина, без догадок.
+3. Completion or blocker note before handoff: реализация, проверки, commit/branch/PR, статус, остаточные риски или точный блокер.
 
 Question note format:
 
@@ -191,11 +220,12 @@ Suggested default: <safe recommended assumption, if one exists>
 Completion note format:
 
 ```text
-Implemented: <short summary>
-Root cause: <short cause, for bugs>
-Verification: <commands and browser checks>
-Branch/PR: <branch, commit, or PR URL if available>
-Notes: <risks, skipped checks, or follow-up if any>
+Сделано: <краткое резюме изменения>
+Причина: <корневая причина для багов или основание для улучшения>
+Проверка: <команды и browser/API/runtime checks>
+Commit/ветка/PR: <branch, commit hash, or PR URL>
+Статус: <куда переведена задача и почему>
+Осталось: <риски, пропущенные проверки или "ничего">
 ```
 
 ## Status Handling
@@ -204,11 +234,11 @@ Use Scout statuses deliberately:
 
 - `new`: not yet taken or returned for later work.
 - `in_progress`: actively being worked or waiting on a direct clarification after ownership was taken.
-- `review`: fix is ready for human review, usually with a commit/branch/PR and verification evidence.
+- `review`: fix is ready for human review with fresh verification evidence, a focused commit or PR reference, and a Russian Scout handoff note.
 - `done`: accepted/merged/resolved according to the user's workflow.
 - `cancelled`: not applicable, duplicate, invalid, or intentionally abandoned.
 
-Do not mark `review` or `done` just because code was edited. There must be fresh verification evidence and a clear handoff.
+Do not mark `review` or `done` just because code was edited. There must be fresh verification evidence, a clear Scout handoff in Russian, and a commit/branch/PR reference unless a documented blocker or explicit no-commit instruction exists.
 
 When a fix covers multiple Scout items:
 
@@ -238,8 +268,9 @@ Do not present the item as complete until all of these are true:
 2. The final diff was reviewed for unrelated changes, secrets, debug code, broad rewrites, and stale TODOs.
 3. Fresh verification evidence exists after the final edit: commands, browser checks, API checks, or a documented reason why a check cannot run.
 4. Frontend, dashboard, widget, or other user-visible changes have browser verification when feasible.
-5. Scout has a concise completion note with implementation, root cause when relevant, verification, and remaining risks.
-6. The Scout status reflects reality: `review` only when ready for review, `done` only when accepted by the workflow, and no silent "left for later" work.
+5. A focused commit exists for completed code changes and references the Scout item, unless explicitly skipped with a documented reason.
+6. Scout has Russian notes covering start, root cause when relevant, completion or blocker, verification, commit/branch/PR, status change, and remaining risks.
+7. The Scout status reflects reality: `in_progress` while working or blocked on clarification, `review` only when committed and ready for review, `done` only when accepted by the workflow, and no silent "left for later" work.
 
 Final user response must be short and evidence-based:
 
@@ -247,6 +278,7 @@ Final user response must be short and evidence-based:
 - What changed.
 - Verification run after the final change.
 - Scout updates made.
+- Commit created and Scout item reference used, or exact reason no commit was created.
 - Anything not completed, with the exact blocker. If nothing remains, say so explicitly.
 
 ## Scout API Reference
@@ -277,7 +309,19 @@ curl -fsS "$SCOUT_URL/api/items/list" \
   -d "{\"projectId\":\"$PROJECT_ID\",\"status\":\"new\",\"page\":1,\"perPage\":100}"
 ```
 
-Use additional list calls for `in_progress` and `review` when checking for overlap. Use `priority` or `search` filters when narrowing a large queue.
+When triaging a queue, prefer one open-status call if available:
+
+```bash
+set -a
+[ ! -f ./.env ] || . ./.env
+set +a
+curl -fsS "$SCOUT_URL/api/items/list" \
+  -H "Authorization: Bearer $SCOUT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d "{\"projectId\":\"$PROJECT_ID\",\"statuses\":[\"new\",\"in_progress\",\"review\"],\"page\":1,\"perPage\":100}"
+```
+
+Use additional list calls only when you need pagination beyond the first page, a narrower search, or compatibility with an older Scout server. Use `priority` or `search` filters when narrowing a large queue.
 
 Get one item:
 

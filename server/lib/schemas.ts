@@ -93,6 +93,7 @@ export const createItemSchema = z.object({
 export const listItemsSchema = paginationSchema.extend({
   projectId: uuidSchema,
   status: z.enum(['new', 'in_progress', 'review', 'done', 'cancelled']).optional(),
+  statuses: z.array(z.enum(['new', 'in_progress', 'review', 'done', 'cancelled'])).min(1).max(5).optional(),
   priority: z.enum(['critical', 'high', 'medium', 'low']).optional(),
   assigneeId: uuidSchema.optional(),
   search: z.string().max(200).optional(),

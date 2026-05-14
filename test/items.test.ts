@@ -112,6 +112,21 @@ describe('Items routes', () => {
     expect(body.data.items).toHaveLength(0);
   });
 
+  it('POST /list — filter by multiple statuses', async () => {
+    const newItem = await createTestItem();
+    const inProgressItem = await createTestItem();
+    await post('/claim', { id: inProgressItem.id }, ctx.developerToken);
+
+    const res = await post('/list', {
+      projectId: ctx.projectId,
+      statuses: ['new', 'in_progress'],
+    }, ctx.adminToken);
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as any;
+    expect(body.data.items.map((item: any) => item.id).sort()).toEqual([newItem.id, inProgressItem.id].sort());
+  });
+
   // === GET ===
 
   it('POST /get — returns item with notes', async () => {

@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
-import { eq, and, desc, count, like, or } from 'drizzle-orm';
+import { eq, and, desc, count, like, or, inArray } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { scoutItems, scoutItemNotes, scoutItemLinks, projects, users, type ApiKey, type ScoutItemLink } from '../db/schema.js';
 import { authMiddleware } from '../middleware/auth.js';
@@ -112,7 +112,7 @@ export const itemRoutes = new Hono()
   .post('/list',
     zValidator('json', listItemsSchema),
     async (c) => {
-      const { projectId, status, priority, assigneeId, search, page, perPage } = c.req.valid('json');
+      const { projectId, status, statuses, priority, assigneeId, search, page, perPage } = c.req.valid('json');
       const user = c.get('user');
 
       // Check project access
@@ -122,6 +122,7 @@ export const itemRoutes = new Hono()
 
       const conditions = [eq(scoutItems.projectId, projectId)];
       if (status) conditions.push(eq(scoutItems.status, status));
+      else if (statuses) conditions.push(inArray(scoutItems.status, statuses));
       if (priority) conditions.push(eq(scoutItems.priority, priority));
       if (assigneeId) conditions.push(eq(scoutItems.assigneeId, assigneeId));
       if (search) conditions.push(like(scoutItems.message, `%${search}%`));
