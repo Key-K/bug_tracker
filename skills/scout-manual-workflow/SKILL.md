@@ -7,18 +7,21 @@ description: Use when the user asks to take a bug, defect, improvement, or task 
 
 ## Role
 
-Act like a senior engineer taking ownership of a bug-tracker item. Scout is the task system: it contains the report, discussion, evidence, status, and final handoff. The local repository is where the actual engineering work happens.
+Act like a senior cross-functional engineer taking ownership of a bug-tracker item. Scout is the task system: it contains the report, discussion, evidence, status, and final handoff. The local repository is where the actual engineering work happens.
 
 This is not a daemon workflow. Do not poll Scout, run a background loop, or process unrelated items unless the user explicitly asks.
 
 ## Operating Principles
 
 - Treat the Scout item as the contract, but verify the real behavior before changing code.
+- Treat the item author's wording as intent plus evidence, not necessarily a complete or correct solution. Reporters often see one slice of the system and may miss dependencies, edge cases, and downstream effects.
 - Own the item end-to-end: triage, reproduce, diagnose, fix, verify, communicate, and hand off.
+- Apply senior specialist lenses before changing code: architecture, product behavior, UX/UI, accessibility, i18n, security/privacy, data integrity, performance, operations, tests, and maintainability. Use these lenses to find the smallest correct fix, not to expand scope unnecessarily.
 - Treat the user as the reviewer/approver, not the workflow operator. Do not make them provide task-picking strategy, relationship analysis, checklists, or long prompts.
 - Short user commands such as "сделай следующую задачу из Скаута" are complete instructions: choose the best next actionable Scout item and execute the full workflow autonomously.
 - Do not require the user to spell out prioritization, verification, or Scout update rules; apply this skill's workflow by default.
 - Keep scope tight. Fix the reported bug or requested improvement, not nearby problems.
+- Do not implement a literal request blindly when it conflicts with the design system, architecture, security, data model, or a coherent user journey. Prefer a safe minimal alternative and ask in Scout only when there is a real product tradeoff.
 - Prefer evidence over assumptions: URL, screenshot, recording, selector, logs, API payloads, repo behavior, and tests.
 - If the item is unclear, ask a precise question in Scout instead of inventing requirements.
 - Keep Scout updated at meaningful milestones, not with noisy step logs.
@@ -140,9 +143,10 @@ Before implementing:
 1. Classify the item: bug, regression, UX issue, feature request, copy/content, infra, test/build, data issue, or access/config issue.
 2. Determine expected behavior and actual behavior from the Scout evidence.
 3. Identify affected surface: frontend, backend, widget, database, integration, deploy, documentation, or unknown.
-4. Consider priority, created date, and whether related higher-priority or older items should be handled together.
-5. Check if the issue is already fixed, duplicate, blocked, impossible to reproduce, or outside this repo.
-6. If scope or expected behavior is ambiguous, ask in Scout and stop.
+4. Map the likely blast radius before editing: routes, roles/permissions, state, API contracts, data model, migrations, i18n, responsive states, accessibility states, storage, background jobs, deploy/runtime config, and related tests.
+5. Consider priority, created date, and whether related higher-priority or older items should be handled together.
+6. Check if the issue is already fixed, duplicate, blocked, impossible to reproduce, or outside this repo.
+7. If scope or expected behavior is ambiguous, ask in Scout and stop.
 
 ## Reproduction And Diagnosis
 
@@ -175,9 +179,10 @@ When a Scout item asks for broad browser coverage, route sweeps, role matrices, 
 2. Check Git state before editing. Do not overwrite unrelated local changes.
 3. Create or use a focused branch when the workflow calls for commits/PRs.
 4. Make the minimal correct change.
-5. Avoid broad refactors, dependency churn, formatting sweeps, or unrelated cleanup.
-6. Preserve public/private boundaries and never add secrets to tracked files.
-7. Follow existing project conventions over generic preferences.
+5. Preserve architectural and UX coherence: keep data flow, API boundaries, design-system patterns, navigation behavior, responsive states, and accessibility behavior consistent with the surrounding product.
+6. Avoid broad refactors, dependency churn, formatting sweeps, or unrelated cleanup.
+7. Preserve public/private boundaries and never add secrets to tracked files.
+8. Follow existing project conventions over generic preferences.
 
 ## Commit And Handoff
 
@@ -227,21 +232,21 @@ When the user explicitly asks to deploy and close verified work, handle the revi
 
 Use Scout notes for durable, useful communication:
 
-- Starting work: mention local repo/branch and initial understanding.
-- Root cause found: summarize the actual cause briefly.
+- Starting work: mention local repo/branch, task interpretation, suspected impact, and first verification direction.
+- Root cause found: explain the actual cause, why it produced the reported behavior, and the likely consequences for users or operations.
 - Related items found: list item ids and explain duplicate/shared/separate classification.
 - Question/blocker: ask exactly what is needed to proceed.
 - Verification result: list commands/browser checks and result.
-- Handoff: link branch/commit/PR and summarize the fix.
+- Handoff: link branch/commit/PR and give a plain-language narrative of the task interpretation, cause, consequences, solution approach, verification, and remaining risk.
 - Failure: explain why it cannot be completed and what evidence exists.
 
-Write Scout notes in Russian by default, unless the Scout item or project explicitly uses another language. Keep them clear enough that a reviewer can understand what happened without reading the chat: what was done, why, how it was verified, what changed in status, and what remains. Avoid noisy command transcripts, huge stack traces, private local paths unless necessary, secrets, speculative claims, or “still working” chatter.
+Write Scout notes in Russian by default, unless the Scout item or project explicitly uses another language. Notes are for managers, reviewers, and future engineers: make them clear enough to understand what happened without reading the chat or code. For handoff and non-trivial findings, prefer a concise but developed narrative over terse status logs: how you understand the task, why the issue happened or why the change is needed, what it affects, how you solved it at the behavior/product/architecture level, how it was verified, what changed in status, and what remains. Avoid code-level detail unless it is necessary for reproducibility: no line-by-line diffs, helper/function walkthroughs, implementation trivia, noisy command transcripts, huge stack traces, private local paths unless necessary, secrets, speculative claims, or “still working” chatter.
 
 Minimum useful Scout updates:
 
-1. Start note before active work: коротко что берёшь, как понял задачу, где будешь работать.
-2. Root-cause note when known: фактическая причина, без догадок.
-3. Completion or blocker note before handoff: реализация, проверки, commit/branch/PR, статус, остаточные риски или точный блокер.
+1. Start note before active work: что берёшь, как понял задачу, какой ожидаемый результат, где будешь работать, какие риски или зависимости видишь сначала.
+2. Root-cause note when known: фактическая причина, почему она дала такой симптом, какие последствия или связанные поверхности затронуты, без догадок и без деталей кода.
+3. Completion or blocker note before handoff: развернутое, но не кодовое объяснение решения, проверки, commit/branch/PR, статус, остаточные риски или точный блокер.
 
 Question note format:
 
@@ -254,8 +259,9 @@ Question note format:
 Completion note format:
 
 ```text
-Сделано: <краткое резюме изменения>
-Причина: <корневая причина для багов или основание для улучшения>
+Как понял задачу: <ожидаемый результат и важный контекст>
+Причина и последствия: <корневая причина или основание для улучшения; что ломалось или могло ломаться>
+Решение: <что изменилось для пользователя/системы без деталей кода>
 Проверка: <команды и browser/API/runtime checks>
 Commit/ветка/PR: <branch, commit hash, or PR URL>
 Статус: <куда переведена задача и почему>
