@@ -189,7 +189,7 @@ When a Scout item asks for broad browser coverage, route sweeps, role matrices, 
 For completed code changes from a Scout item, create a focused git commit after final verification unless the user explicitly says not to commit or the repository policy forbids commits.
 
 1. Commit only the files that belong to the Scout item. Do not include unrelated local changes, generated secrets, local env files, private runbooks, or incidental reports.
-2. Keep the commit message in the repository's required language. When working in this Scout repository, commit messages are English.
+2. Keep the commit message in the repository's required language.
 3. Include a durable Scout reference in the commit body, for example `Scout-Item: <SCOUT_ITEM_URL_OR_ID>`. If a project uses issue-style refs, follow that existing convention.
 4. Do not push unless the user or repo workflow explicitly asks for push.
 5. After the commit succeeds, update Scout with the branch name and commit hash or PR URL. If the commit cannot be created, explain the exact blocker in Scout and do not mark the item ready for review.
@@ -217,7 +217,7 @@ When the user wants to complete many Scout items before deploying, keep local wo
 
 When the user explicitly asks to deploy and close verified work, handle the review queue after a successful deploy.
 
-1. Deploy only through the repository's canonical deploy path and wait for deploy health checks to pass. For Scout's own production deploy (`scout.kafu.kz`), the canonical path is GitHub Actions Deploy from `master`; never deploy it from `dev` or via SSH/manual fallback unless the user explicitly approves that fallback after an Actions failure.
+1. Deploy only through the repository's canonical deploy path and wait for deploy health checks to pass. If the canonical path fails, stop and report the failed run, command, or check; do not invent a manual fallback unless the user explicitly approves it for that incident.
 2. Discover all `review` items in scope. If the user says "all review tasks", inspect all review items for the relevant Scout project; otherwise limit to items linked to the deployed branch/commit/PR.
 3. For each review item, fetch the full item, notes, evidence, commit/branch/PR fields, related items, and acceptance hints before testing.
 4. Verify on staging, not local: use the deployed staging URL, staging API, browser checks for user-visible work, and targeted API/runtime checks for backend work.
