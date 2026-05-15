@@ -255,11 +255,23 @@ Recommended note structure for substantial updates:
 
 Use technical terms when they are useful, but explain their consequence in normal language. Avoid implementation trivia, noisy command transcripts, huge stack traces, private local paths unless necessary, secrets, speculative claims, and “still working” chatter.
 
+When adding long Scout notes through the API, build JSON with a safe encoder such as `jq -n --arg itemId "$SCOUT_ITEM_ID" --arg content "$NOTE" '{itemId:$itemId,content:$content}'` and pass that payload to `curl`. Avoid hand-escaped shell JSON for multi-line notes, backticks, quotes, or non-ASCII text.
+
 Minimum useful Scout updates:
 
 1. Start note before active work: что берёшь, как понял задачу, какой ожидаемый результат, где будешь работать, какие риски или зависимости видишь сначала.
 2. Root-cause note when known: фактическая причина, почему она дала такой симптом, какие последствия или связанные поверхности затронуты, без догадок и без деталей кода.
 3. Completion or blocker note before handoff: развернутое, но не кодовое объяснение решения, проверки, commit/branch/PR, статус, остаточные риски или точный блокер.
+
+## Scout Evidence Scope
+
+Use Scout evidence in the cheapest order that can answer the question:
+
+1. Read the item fields, existing notes, environment metadata, selector, element text/HTML, screenshot path, and links first.
+2. Open the screenshot or direct URL when visual context is needed.
+3. Download or inspect session recordings only when the issue depends on interaction timing, multi-step behavior, or evidence not available from item fields/screenshot/notes.
+
+Do not download large rrweb/session-recording files as a default first step. If you do fetch one, search it for targeted strings/events rather than pasting or reading the whole artifact.
 
 Question note format:
 
