@@ -63,6 +63,18 @@ app.get('/health', (c) => {
   }
 });
 
+app.get('/api/dashboard-config', (c) => {
+  const dashboardWidgetProjectSlug = process.env.SCOUT_DASHBOARD_WIDGET_PROJECT_SLUG?.trim();
+
+  return c.json({
+    data: {
+      dashboardWidget: dashboardWidgetProjectSlug
+        ? { projectSlug: dashboardWidgetProjectSlug }
+        : null,
+    },
+  });
+});
+
 // --- CORS ---
 const isProduction = process.env.NODE_ENV === 'production';
 const corsOrigins = (process.env.SCOUT_CORS_ORIGINS || '')
