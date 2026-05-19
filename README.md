@@ -137,7 +137,7 @@ User APIs use `projectRoles` for per-project access assignment.
 
 Scout also ships an installable agent skill for manual bug-tracker work. It is useful when a coding agent should take a Scout item, triage related items, reproduce the bug, fix it in a local repository, verify the result, and update Scout notes/statuses without relying on background automation.
 
-For OpenCode users, Scout also ships slash commands such as `/scout-one`, `/scout-all`, `/scout-review`, `/scout-audit`, `/scout-resume`, and `/scout-triage`. They live in `.opencode/commands/` and can be installed globally with:
+For OpenCode users, Scout also ships simple slash commands: `/scout-one`, `/scout-all`, `/scout-review`, and `/scout-audit`. They run the full Scout workflow through `scout-manual-workflow` and can be installed globally with:
 
 ```bash
 ./scripts/install-opencode-commands.sh

@@ -8,19 +8,14 @@ Use this skill when an AI coding agent should take a Scout item and handle it ma
 
 ## OpenCode Commands
 
-Scout also ships OpenCode slash commands in `.opencode/commands/`. These commands are thin entrypoints into `scout-manual-workflow`; keep lifecycle rules in the skill and keep commands focused on invocation mode.
+Scout also ships simple OpenCode slash commands in `.opencode/commands/`. These commands are thin entrypoints into `scout-manual-workflow`; keep lifecycle rules in the skill and keep commands focused on invocation mode.
 
-Primary commands:
+- `/scout-one`: finish one Scout item completely, or choose the next actionable item when no item is specified.
+- `/scout-all`: finish all actionable Scout items in scope until they are done, waiting for unavailable target verification, or honestly blocked.
+- `/scout-review`: finish items already waiting in review by verifying the target environment, closing passing items, and fixing/reopening failures.
+- `/scout-audit`: audit completed items with fresh evidence and repair or reopen anything that is not actually accepted.
 
-- `/scout-one [item-id|item-url|scope]`: solve exactly one Scout item, or choose the next actionable item when no argument is provided.
-- `/scout-all [project|scope]`: process all actionable Scout items in scope until the queue is done, reviewed, or honestly blocked.
-
-Operational commands:
-
-- `/scout-review [project|item|deploy-target]`: verify the `review` queue on the accepted target environment and close passing items.
-- `/scout-audit [project|scope]`: audit completed items with fresh evidence without code changes by default.
-- `/scout-resume [item|project|ledger|artifact]`: resume interrupted Scout work from live state instead of stale chat memory.
-- `/scout-triage [project|scope]`: cluster and prioritize Scout work without code or status mutations.
+All commands work without arguments. Any text after the command is only an optional hint, not the primary interface.
 
 Install the commands globally for use in any repository:
 
