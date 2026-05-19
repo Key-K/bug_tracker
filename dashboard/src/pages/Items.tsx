@@ -3,6 +3,11 @@ import { useNavigate } from 'react-router';
 import { api } from '../lib/api';
 import { formatDate, formatDateShort } from '../lib/date';
 import { isAdmin } from '../lib/auth';
+import {
+  findSelectableProjectId,
+  getStoredSelectedProjectId,
+  storeSelectedProjectId,
+} from '../lib/project-selection';
 import { useSSE } from '../hooks/useSSE';
 import { useTranslation } from '../i18n';
 import StatusBadge from '../components/StatusBadge';
@@ -66,7 +71,7 @@ export default function Items() {
   const admin = isAdmin();
   const { t, locale } = useTranslation();
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProject, setSelectedProject] = useState<string>('');
+  const [selectedProject, setSelectedProject] = useState<string>(() => getStoredSelectedProjectId());
   const [items, setItems] = useState<Item[]>([]);
   const [pagination, setPagination] = useState<PaginationData>({
     page: 1,
@@ -101,9 +106,11 @@ export default function Items() {
     api<{ items: Project[] }>('/api/projects/list', { perPage: 100 }).then(
       (res) => {
         setProjects(res.items);
-        if (res.items.length > 0 && !selectedProject) {
-          setSelectedProject(res.items[0]!.id);
-        }
+        setSelectedProject((current) => {
+          const next = findSelectableProjectId(res.items, current, getStoredSelectedProjectId());
+          storeSelectedProjectId(next);
+          return next;
+        });
       },
     ).catch(() => {});
   }, []);
@@ -168,7 +175,9 @@ export default function Items() {
   useSSE({ projectId: selectedProject, onEvent: handleSSEEvent });
 
   function handleProjectChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    setSelectedProject(e.target.value);
+    const projectId = e.target.value;
+    setSelectedProject(projectId);
+    storeSelectedProjectId(projectId);
     setPagination((p) => ({ ...p, page: 1 }));
     setStatusFilter('all');
     setSearch('');

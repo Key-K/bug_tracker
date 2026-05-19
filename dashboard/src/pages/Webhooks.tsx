@@ -1,6 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router';
 import { api } from '../lib/api';
+import {
+  findSelectableProjectId,
+  getStoredSelectedProjectId,
+  storeSelectedProjectId,
+} from '../lib/project-selection';
 import { useTranslation } from '../i18n';
 import Toggle from '../components/Toggle';
 
@@ -41,7 +46,9 @@ export default function Webhooks() {
   const { t } = useTranslation();
 
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState(initialProjectId);
+  const [selectedProjectId, setSelectedProjectId] = useState(
+    () => initialProjectId || getStoredSelectedProjectId(),
+  );
   const [webhooksItems, setWebhooks] = useState<Webhook[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -57,9 +64,11 @@ export default function Webhooks() {
       try {
         const res = await api<{ items: Project[] }>('/api/projects/list', { perPage: 100 });
         setProjects(res.items);
-        if (!selectedProjectId && res.items.length > 0) {
-          setSelectedProjectId(res.items[0]!.id);
-        }
+        setSelectedProjectId((current) => {
+          const next = findSelectableProjectId(res.items, current, getStoredSelectedProjectId());
+          storeSelectedProjectId(next);
+          return next;
+        });
       } catch {
         // ignore
       }
@@ -186,6 +195,12 @@ export default function Webhooks() {
     }));
   }
 
+  function handleProjectChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const projectId = e.target.value;
+    setSelectedProjectId(projectId);
+    storeSelectedProjectId(projectId);
+  }
+
   function parseEvents(eventsJson: string): string[] {
     try { return JSON.parse(eventsJson); } catch { return []; }
   }
@@ -200,7 +215,7 @@ export default function Webhooks() {
         <div className="flex items-center gap-3">
           <select
             value={selectedProjectId}
-            onChange={(e) => setSelectedProjectId(e.target.value)}
+            onChange={handleProjectChange}
             className="rounded-md border border-gray-300 px-3 py-1.5 text-sm"
           >
             {projects.map((p) => (
