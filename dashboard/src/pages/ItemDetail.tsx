@@ -862,6 +862,35 @@ export default function ItemDetail() {
                   {t('items.detail.actions.returnToWork')}
                 </button>
                 <button
+                  onClick={() =>
+                    handleAction('update-status', { status: 'testing' })
+                  }
+                  disabled={actionLoading}
+                  className="w-full md:w-auto rounded-md bg-indigo-600 px-3 py-2 md:py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {t('items.detail.actions.testing')}
+                </button>
+                <button
+                  onClick={() => openHandoffModal('done')}
+                  disabled={actionLoading}
+                  className="w-full md:w-auto rounded-md bg-green-600 px-3 py-2 md:py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                >
+                  {t('items.detail.actions.done')}
+                </button>
+              </>
+            )}
+            {item.status === 'testing' && item.permissions.canUpdateStatus && (
+              <>
+                <button
+                  onClick={() =>
+                    handleAction('update-status', { status: 'in_progress' })
+                  }
+                  disabled={actionLoading}
+                  className="w-full md:w-auto rounded-md border border-gray-300 px-3 py-2 md:py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  {t('items.detail.actions.returnToWork')}
+                </button>
+                <button
                   onClick={() => openHandoffModal('done')}
                   disabled={actionLoading}
                   className="w-full md:w-auto rounded-md bg-green-600 px-3 py-2 md:py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"

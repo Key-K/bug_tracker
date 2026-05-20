@@ -47,7 +47,7 @@ const spec = {
       // ── Enums ──
       ItemStatus: {
         type: 'string',
-        enum: ['new', 'in_progress', 'review', 'done', 'cancelled'],
+        enum: ['new', 'in_progress', 'review', 'testing', 'done', 'cancelled'],
       },
       ItemPriority: {
         type: 'string',
@@ -525,7 +525,7 @@ const spec = {
                 properties: {
                   projectId: { type: 'string', format: 'uuid' },
                   status: { $ref: '#/components/schemas/ItemStatus' },
-                  statuses: { type: 'array', items: { $ref: '#/components/schemas/ItemStatus' }, minItems: 1, maxItems: 5, description: 'Filter by multiple statuses, useful for open queue triage. If status is provided, status takes precedence.' },
+                  statuses: { type: 'array', items: { $ref: '#/components/schemas/ItemStatus' }, minItems: 1, maxItems: 6, description: 'Filter by multiple statuses, useful for open queue triage. If status is provided, status takes precedence.' },
                   priority: { $ref: '#/components/schemas/ItemPriority' },
                   assigneeId: { type: 'string', format: 'uuid' },
                   search: { type: 'string', maxLength: 200, description: 'Поиск по тексту сообщения (LIKE)' },

@@ -182,6 +182,7 @@ describe('Items routes', () => {
     const body = await res.json() as any;
     expect(body.data.counts.new).toBe(2);
     expect(body.data.counts.in_progress).toBe(0);
+    expect(body.data.counts.testing).toBe(0);
   });
 
   // === CLAIM ===
@@ -617,6 +618,32 @@ describe('Items routes', () => {
     expect(res.status).toBe(200);
     const body = await res.json() as any;
     expect(body.data.status).toBe('review');
+  });
+
+  it('POST /update-status — developer member can change review → testing → done', async () => {
+    const item = await createTestItem();
+    await post('/claim', { id: item.id }, ctx.developerToken);
+    await post('/update-status', {
+      id: item.id,
+      status: 'review',
+      evidence: testEvidence({ scenario: 'Move item to testing handoff' }),
+    }, ctx.developerToken);
+
+    const testingRes = await post('/update-status', {
+      id: item.id,
+      status: 'testing',
+    }, ctx.developerToken);
+    expect(testingRes.status).toBe(200);
+    const testingBody = await testingRes.json() as any;
+    expect(testingBody.data.status).toBe('testing');
+
+    const doneRes = await post('/resolve', {
+      id: item.id,
+      evidence: testEvidence({ scenario: 'Resolve item after testing' }),
+    }, ctx.developerToken);
+    expect(doneRes.status).toBe(200);
+    const doneBody = await doneRes.json() as any;
+    expect(doneBody.data.status).toBe('done');
   });
 
   it('POST /update-status — review requires evidence', async () => {

@@ -53,7 +53,7 @@ export const scoutItems = sqliteTable('scout_items', {
   projectId: text('project_id').notNull().references(() => projects.id),
   message: text('message').notNull(),
   status: text('status', {
-    enum: ['new', 'in_progress', 'review', 'done', 'cancelled'],
+    enum: ['new', 'in_progress', 'review', 'testing', 'done', 'cancelled'],
   }).notNull().default('new'),
   pageUrl: text('page_url'),
   pageRoute: text('page_route'),

@@ -207,7 +207,7 @@ export const itemRoutes = new Hono()
       if (!checkProjectAccess(user.id, user.role, projectId, c.get('apiKey'))) {
         throw new ForbiddenError('Нет доступа к этому проекту', 'NO_PROJECT_ACCESS');
       }
-      const statuses = ['new', 'in_progress', 'review', 'done', 'cancelled'] as const;
+      const statuses = ['new', 'in_progress', 'review', 'testing', 'done', 'cancelled'] as const;
       const counts: Record<string, number> = {};
 
       for (const status of statuses) {

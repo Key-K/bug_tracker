@@ -48,17 +48,19 @@ interface Counts {
   new: number;
   in_progress: number;
   review: number;
+  testing: number;
   done: number;
   cancelled: number;
 }
 
-const STATUSES = ['all', 'new', 'in_progress', 'review', 'done', 'cancelled'] as const;
+const STATUSES = ['all', 'new', 'in_progress', 'review', 'testing', 'done', 'cancelled'] as const;
 
 const STATUS_KEYS: Record<string, string> = {
   all: 'items.statuses.all',
   new: 'items.statuses.new',
   in_progress: 'items.statuses.in_progress',
   review: 'items.statuses.review',
+  testing: 'items.statuses.testing',
   done: 'items.statuses.done',
   cancelled: 'items.statuses.cancelled',
 };
@@ -84,6 +86,7 @@ export default function Items() {
     new: 0,
     in_progress: 0,
     review: 0,
+    testing: 0,
     done: 0,
     cancelled: 0,
   });
@@ -218,7 +221,7 @@ export default function Items() {
   }
 
   const totalAll =
-    counts.new + counts.in_progress + counts.review + counts.done + counts.cancelled;
+    counts.new + counts.in_progress + counts.review + counts.testing + counts.done + counts.cancelled;
 
   function getTabCount(status: string): number | null {
     if (status === 'all') return totalAll || null;

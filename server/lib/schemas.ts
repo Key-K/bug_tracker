@@ -111,8 +111,8 @@ export const createItemSchema = z.object({
 
 export const listItemsSchema = paginationSchema.extend({
   projectId: uuidSchema,
-  status: z.enum(['new', 'in_progress', 'review', 'done', 'cancelled']).optional(),
-  statuses: z.array(z.enum(['new', 'in_progress', 'review', 'done', 'cancelled'])).min(1).max(5).optional(),
+  status: z.enum(['new', 'in_progress', 'review', 'testing', 'done', 'cancelled']).optional(),
+  statuses: z.array(z.enum(['new', 'in_progress', 'review', 'testing', 'done', 'cancelled'])).min(1).max(6).optional(),
   priority: z.enum(['critical', 'high', 'medium', 'low']).optional(),
   assigneeId: uuidSchema.optional(),
   search: z.string().max(200).optional(),
@@ -122,7 +122,7 @@ export const getItemSchema = z.object({ id: uuidSchema });
 
 export const countItemsSchema = z.object({
   projectId: uuidSchema,
-  status: z.enum(['new', 'in_progress', 'review', 'done', 'cancelled']).optional(),
+  status: z.enum(['new', 'in_progress', 'review', 'testing', 'done', 'cancelled']).optional(),
 });
 
 export const claimItemSchema = z.object({ id: uuidSchema });
@@ -139,7 +139,7 @@ export const cancelItemSchema = z.object({ id: uuidSchema });
 
 export const updateItemStatusSchema = z.object({
   id: uuidSchema,
-  status: z.enum(['new', 'in_progress', 'review', 'done', 'cancelled']),
+  status: z.enum(['new', 'in_progress', 'review', 'testing', 'done', 'cancelled']),
   branchName: z.string().max(255).optional(),
   mrUrl: z.string().url().max(500).optional(),
   attemptCount: z.number().int().min(0).optional(),
