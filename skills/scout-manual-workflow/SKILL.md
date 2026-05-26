@@ -1,6 +1,6 @@
 ---
 name: scout-manual-workflow
-description: Use when the user asks to take a bug, defect, improvement, or task from Scout and handle it manually like a professional engineer working from a bug tracker. Also use for short commands like "do the next Scout task", "сделай следующую задачу из Скаута", or "возьми задачу из Scout".
+description: Use when the user asks to take a bug, note, defect, improvement, or task from Scout and handle it like a professional AI operator working from Scout. Also use for short commands like "do the next Scout task", "сделай следующую задачу из Скаута", or "возьми задачу из Scout".
 ---
 
 # Scout Manual Workflow
@@ -21,7 +21,8 @@ When this skill is active, OpenCode is the operator of the Scout item lifecycle.
 2. Ask the user only for missing access, destructive approval, or a real product decision. Do not ask for routine status, verification, or handoff choices that this skill defines.
 3. Before every Scout status change, evaluate the status preconditions in `Status Transition Algorithm`. If a precondition is false, do not change the status; add a concise blocker or progress note instead.
 4. Prefer one atomic Scout status API call that includes the `evidence` object when moving to `review` or `done`. Use `/api/items/add-evidence` before the status call only when the evidence must exist independently before the transition.
-5. Keep user-facing chat short. Durable operational detail belongs in Scout notes and structured evidence, not in chat.
+5. Treat `note` items as AI-triage input, not as developer chores. Convert actionable notes to `task` yourself when the desired work is clear enough; otherwise link, cancel, or ask one focused Scout question.
+6. Keep user-facing chat short. Durable operational detail belongs in Scout notes and structured evidence, not in chat.
 
 ## Professional Ownership Mode
 
@@ -59,6 +60,7 @@ Handle routine engineering decisions without asking the user:
 
 - choose the next actionable item when no item id is provided;
 - classify and prioritize the item;
+- triage notes and convert them to tasks when they are actionable without a product decision;
 - decide whether to claim it now or leave it with a question/blocker;
 - search for duplicates, related items, blockers, conflicts, and shared root causes;
 - infer likely stakeholder intent and acceptance criteria from the report, evidence, product context, and existing behavior;
@@ -104,9 +106,10 @@ When the user asks to work from Scout:
 2. If no item id is given, use `SCOUT_PROJECT_SLUG` or the user's project name to find the relevant project, then inspect the candidate queue before choosing work.
 3. Fetch the full item before editing code.
 4. Read the item type (`bug`, `note`, `task`), source, message, status, priority, labels, created date, URL, route, component hints, selector, element text/HTML, screenshot path, session recording path, existing notes, assignee, branch, and PR link.
-5. Decide whether the item is actionable now.
-6. If actionable, leave a concise Scout note that you are taking it and what local repo/branch you will use.
-7. Claim the item or move it to `in_progress` only when you are actually starting work.
+5. If the item is a `note`, run `AI Note Triage Algorithm` before any code work. Do not claim a note directly.
+6. Decide whether the resulting item is actionable now.
+7. If actionable, leave a concise Scout note that you are taking it and what local repo/branch you will use.
+8. Claim the item or move it to `in_progress` only when you are actually starting work.
 
 ## Scout Item Types
 
@@ -114,15 +117,43 @@ Scout has three intentionally simple work item types. Treat type as a workflow d
 
 - `bug`: something is broken. Reproduce, diagnose, fix, verify, and move through workflow when evidence supports it.
 - `task`: committed project work. Clarify acceptance from the item, implement the smallest complete change, verify, and move through workflow when evidence supports it.
-- `note`: a lightweight observation captured during testing. Do not claim, implement, or move it through engineering workflow as-is. Triage it first: ask a focused question, link it to related work, cancel it if not useful, or convert it to `task` only when the desired work is clear and worth doing.
+- `note`: a lightweight observation captured during testing. Do not claim, implement, or move it through engineering workflow as-is. Triage it first. If the desired work is clear enough, convert it to `task` yourself and continue; if not, ask a focused question, link it to related work, or cancel it with a reason.
 
-When selecting the next actionable item, prefer `bug` and `task`. Include `note` only when the user explicitly asks for triage/inbox cleanup or when no actionable bug/task exists and the note can be safely clarified without code changes. If an API call rejects a note with `NOTE_REQUIRES_TRIAGE`, add a concise Scout note explaining the needed triage action instead of forcing the workflow.
+When selecting the next actionable item, include `note` items in the candidate queue instead of ignoring them. Prefer critical/high `bug` and already-committed `task` work, but actively triage notes when they are old, high-signal, related to current work, or no higher-priority bug/task is available. If an API call rejects a note with `NOTE_REQUIRES_TRIAGE`, run note triage instead of forcing the workflow.
+
+## AI Note Triage Algorithm
+
+Notes exist to keep widget capture lightweight while moving triage effort from humans to the AI agent. The goal is to turn useful notes into work without making testers choose Jira-like fields in the widget.
+
+When handling a `note`:
+
+1. Read the full note context and nearby evidence: page URL, metadata, reporter, labels, existing comments, related items, and current project conventions.
+2. Search for related open bugs/tasks/notes before deciding. Link obvious duplicates or shared-root items yourself.
+3. Decide whether the note is actionable without a human product decision.
+4. A note is actionable when it names a desired outcome or user problem, the affected surface is discoverable, acceptance can be inferred safely, and the likely change is within the current repo/project.
+5. A note is not actionable when it is only a vague thought, conflicts with existing product behavior, lacks the affected surface, needs priority/business approval, or would require broad product design beyond the captured observation.
+
+If actionable:
+
+1. Add a concise Scout triage note explaining why it is being converted and the inferred acceptance criteria.
+2. Convert it with `/api/items/update` using `itemType: "task"` before claiming or changing workflow status.
+3. Normalize title/message only if the existing message is unclear and the API/update permission allows it. Preserve the reporter's original signal in the triage note.
+4. Continue through the normal task workflow: claim, implement, verify, add evidence, and hand off.
+
+If not actionable:
+
+1. Add exactly one focused Scout question or blocker note that names the missing decision/evidence.
+2. Link it to a related item if that helps the next triage pass.
+3. Leave it as `note` and do not claim it.
+4. Cancel it only when it is clearly duplicate, obsolete, outside scope, or not useful; always leave the reason in Scout.
+
+Never use code changes as a way to guess through an unclear note. The AI agent can reduce developer workload by triaging and converting notes, but it must not silently invent product requirements.
 
 ## Queue Triage
 
 When selecting work from a project rather than a specific item, first inspect the queue like a bug triage owner, not like a FIFO script.
 
-1. List open items across relevant statuses: `new`, `in_progress`, `review`, and `testing` when appropriate. Prefer one `/api/items/list` call with `statuses` when Scout supports it; otherwise make separate status calls. Filter or de-prioritize `itemType: note` unless the requested work is triage.
+1. List open items across relevant statuses: `new`, `in_progress`, `review`, and `testing` when appropriate. Prefer one `/api/items/list` call with `statuses` when Scout supports it; otherwise make separate status calls. Include `itemType: note` in discovery so useful notes can be converted by AI triage instead of waiting for a developer.
 2. Sort by severity and urgency first, then age:
    - `critical`: production outage, data loss/corruption, security/privacy issue, broken core workflow.
    - `high`: major user-visible failure, blocked important workflow, strong business impact.
@@ -137,8 +168,9 @@ Recommended selection order:
 
 1. Critical items, oldest first, grouped by suspected root cause.
 2. High priority regressions or blockers, oldest first.
-3. Related clusters where one fix may resolve multiple open items.
-4. Remaining oldest actionable items within the requested scope.
+3. Actionable notes related to critical/high work, converted to tasks before implementation.
+4. Related clusters where one fix may resolve multiple open items.
+5. Remaining oldest actionable bugs, tasks, or convertible notes within the requested scope.
 
 ## Related Items And Duplicate Work
 

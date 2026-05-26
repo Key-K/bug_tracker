@@ -107,39 +107,50 @@ export const WIDGET_STYLES = `
   /* Picker instruction banner */
   .scout-picker-banner {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
+    left: 50%;
+    right: auto;
+    bottom: calc(16px + var(--safe-bottom));
     z-index: 1000002;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: calc(12px + var(--safe-top)) 16px 12px;
-    background: #1e293b;
+    gap: 12px;
+    width: min(calc(100vw - 32px - var(--safe-left) - var(--safe-right)), 760px);
+    padding: 10px 10px 10px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    background: rgba(15, 23, 42, 0.96);
+    backdrop-filter: blur(8px);
     color: #fff;
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 500;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 18px 45px rgba(15, 23, 42, 0.35);
     opacity: 0;
-    transform: translateY(-100%);
+    pointer-events: none;
+    transform: translate(-50%, calc(100% + 24px));
     transition: opacity 0.2s ease, transform 0.2s ease;
   }
 
   .scout-picker-banner.visible {
     opacity: 1;
-    transform: translateY(0);
+    transform: translate(-50%, 0);
   }
 
   .scout-picker-banner-text {
     display: flex;
     align-items: center;
+    flex: 1;
     gap: 8px;
+    min-width: 0;
+    line-height: 1.35;
   }
 
   .scout-picker-banner-actions {
     display: flex;
     align-items: center;
-    gap: 8px;
+    flex-shrink: 0;
+    gap: 6px;
+    pointer-events: auto;
   }
 
   .scout-picker-banner-icon {
@@ -150,6 +161,9 @@ export const WIDGET_STYLES = `
   }
 
   .scout-picker-banner-cancel {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     background: rgba(255, 255, 255, 0.15);
     border: none;
     color: #fff;
@@ -162,9 +176,13 @@ export const WIDGET_STYLES = `
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
     min-height: 36px;
+    white-space: nowrap;
   }
 
   .scout-picker-banner-note {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     background: #fff;
     border: none;
     color: #1e293b;
@@ -177,10 +195,40 @@ export const WIDGET_STYLES = `
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
     min-height: 36px;
+    white-space: nowrap;
+  }
+
+  .scout-picker-banner-note:active {
+    background: #e2e8f0;
   }
 
   .scout-picker-banner-cancel:active {
     background: rgba(255, 255, 255, 0.25);
+  }
+
+  @media (max-width: 640px) {
+    .scout-picker-banner {
+      bottom: calc(10px + var(--safe-bottom));
+      width: calc(100vw - 20px - var(--safe-left) - var(--safe-right));
+      flex-direction: column;
+      align-items: stretch;
+      gap: 10px;
+      padding: 10px;
+    }
+
+    .scout-picker-banner-text {
+      font-size: 13px;
+    }
+
+    .scout-picker-banner-actions {
+      width: 100%;
+    }
+
+    .scout-picker-banner-note,
+    .scout-picker-banner-cancel {
+      flex: 1;
+      justify-content: center;
+    }
   }
 
   /* Loading overlay (between element pick and panel open) */
