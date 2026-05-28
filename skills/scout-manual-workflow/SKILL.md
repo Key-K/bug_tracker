@@ -23,6 +23,8 @@ When this skill is active, OpenCode is the operator of the Scout item lifecycle.
 4. Prefer one atomic Scout status API call that includes the `evidence` object when moving to `review` or `done`. Use `/api/items/add-evidence` before the status call only when the evidence must exist independently before the transition.
 5. Treat `note` items as AI-triage input, not as developer chores. Convert actionable notes to `task` yourself when the desired work is clear enough; otherwise link, cancel, or ask one focused Scout question.
 6. Keep user-facing chat short. Durable operational detail belongs in Scout notes and structured evidence, not in chat.
+7. Treat Scout slash commands as mode selectors. The skill is the source of truth; do not duplicate long command checklists in chat, Scout notes, or final summaries.
+8. For batch work, process one cohesive item or shared-root cluster at a time when evidence supports clustering. Status transitions, evidence, and notes still remain item-specific.
 
 ## Professional Ownership Mode
 
@@ -206,6 +208,16 @@ Rules for handling clusters:
 8. If items conflict, link them as `conflicts`, stop, and ask a product/owner question in Scout instead of choosing arbitrarily.
 9. If no related items are found, say that in the completion note so the absence of links is intentional.
 
+## Batch Efficiency
+
+When a user asks for many Scout items, optimize for correct throughput, not mechanical item-by-item repetition.
+
+1. Build the live queue once at the start of the batch, then refresh it after a status-changing batch or when new information could change priority. Do not refetch the whole queue after every read-only step.
+2. Cluster items only with evidence: same route, component, root cause, deploy target, or acceptance path. Keep unrelated items separate even if they are close in the UI.
+3. For a shared-root cluster, make one cohesive code change and one verification matrix, then write item-specific evidence/notes/statuses for each covered Scout item.
+4. Avoid status noise: do not claim every candidate just because it was listed. Claim an item when implementation or active verification starts.
+5. Keep the ledger as the durable progress source for batch state. Do not paste full queue snapshots or every API response into chat or Scout notes.
+
 ## Triage
 
 Before implementing:
@@ -229,6 +241,17 @@ For bugs, reproduce or collect the nearest practical evidence before fixing:
 5. Add temporary probes only if they help find the cause; remove them before completion.
 
 If reproduction is impossible but the evidence is strong, say so in Scout and make the smallest evidence-backed fix.
+
+## External Provider And Stateful Preconditions
+
+Before live-money, provider-callback, production-like, external-communication, or other hard-to-undo third-party actions, run a preflight that can stop bad attempts early.
+
+1. Check project docs, repo-local skills, provider onboarding/support context, current env, live DNS/server state, and existing Scout notes for provider-side prerequisites before the first stateful attempt.
+2. Confirm the current public URL, HTTP method, content type, domain/IP/port, whitelist/firewall status, provider service activation, credentials presence, sandbox availability, minimum amount, and rollback/cancel path when those facts matter.
+3. Prefer sandbox, simulation, or direct provider API checks when they exercise the same state machine without real money or irreversible side effects.
+4. If a public endpoint is reachable but provider attempts produce no inbound gateway/app logs, stop repeating live attempts. Treat provider delivery, whitelist, firewall, cabinet URL, or method mismatch as the blocker until provider-side evidence says otherwise.
+5. Do not send Telegram, email, or provider/support messages without explicit user approval for the exact recipient and message. Draft the message first and wait.
+6. Record the preflight result in Scout when it changes status, blocks verification, or prevents a risky live attempt.
 
 ## User Journey Verification
 
@@ -312,6 +335,8 @@ For batch work, audits, broad sweeps, or any run that must survive session compa
 2. Do not use OS temp paths such as `/tmp`, `/var/folders/...`, browser download folders, or tracked repository paths for ledgers.
 3. Store item ids, statuses, decisions, evidence summaries, commit/deploy refs, and next actions. Do not store secrets, cookies, full tokens, raw private payloads, or huge logs.
 4. Update the ledger after each item or small batch, before moving on to unrelated work.
+5. Ledger rows are operational artifacts, not source edits. Use a safe JSON encoder and append outside the repo; avoid spending time forcing ledger updates through code-edit workflows.
+6. If a PTY session, deploy log, browser sweep, or long command produced evidence, capture the command, exit status, and relevant result summary in Scout/ledger/final notes before cleaning up the session or deleting logs.
 
 ## Implementation
 
@@ -351,7 +376,7 @@ When updating Scout status after a local commit:
 
 When the user wants to complete many Scout items before deploying, keep local work and deployment as separate phases.
 
-1. Process items one at a time through the normal local lifecycle: claim, diagnose, fix, verify locally, commit with Scout reference, add Russian notes, and move to `review`.
+1. Process one item or one evidence-backed shared-root cluster at a time through the normal local lifecycle: claim only active items, diagnose, fix, verify locally, commit with Scout reference, add Russian notes, and move covered items to `review` individually.
 2. Do not deploy after each item unless the user explicitly asks or the item is an urgent hotfix.
 3. Maintain clear verification queues: every item in `review` must have a commit/branch/PR reference, local verification evidence, and a Russian handoff note; every item in `testing` must have an active target-environment verification owner or a recorded blocker.
 4. If several items share one root cause, one cohesive commit may reference multiple Scout items. Add notes to each covered item and verify each item's acceptance condition.
