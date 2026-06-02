@@ -22,7 +22,7 @@
 
 ## What is Scout?
 
-Scout is a self-hosted tracker for teams that want high-quality bug reports and a clean handoff to humans or coding agents. Testers report bugs via an embeddable widget that captures element context, screenshots, and session recordings. While testing, they can also save lightweight notes without turning them into committed work. AI agents can triage actionable notes into tasks, link related items, add comments, and move bugs/tasks through the workflow with evidence.
+Scout is a self-hosted tracker for teams that want high-quality bug reports and a clean handoff to humans or coding agents. Testers report bugs via an embeddable widget that captures element context, screenshots, and session recordings. While testing, they can also save lightweight notes without turning them into committed work. Runtime integrations can group operational errors and link them to normal Scout items. AI agents can triage actionable notes, inspect linked runtime error context, link related items, add comments, and move bugs/tasks through the workflow with evidence.
 
 ```
 Tester clicks element  →  Widget creates bug with context + screenshot + recording
@@ -40,9 +40,9 @@ Tester saves note     →  Widget stores page-level observation without workflow
 | Area | Details |
 |------|---------|
 | **Widget** | Bug-first reporting, optional non-bug notes, Shadow DOM isolation, element picker with instruction banner, html2canvas-pro screenshot with element highlight, rrweb session recording (60s buffer), cross-domain SSO |
-| **Dashboard** | React SPA, bug/note/task items, manual creation, note-to-task triage, rrweb session player, items/projects/users/webhooks management, locale switcher |
+| **Dashboard** | React SPA, bug/note/task items, runtime error groups, manual creation, note-to-task triage, rrweb session player, items/projects/users/webhooks management, locale switcher |
 | **i18n** | Russian, English, Uzbek (Latin). Dashboard + widget. Server error codes translated on client |
-| **Agent workflows** | Manual agent skill for controlled bug/task work, including AI triage that converts actionable notes into tasks without background automation |
+| **Agent workflows** | Manual agent skill for controlled bug/task work, including AI triage that converts actionable notes into tasks and runtime error context handling without background automation |
 | **Auth** | JWT + API keys (`sk_live_*`), system roles (admin/member), project roles (owner/manager/developer/reporter/viewer), cross-domain SSO |
 | **Infra** | Single process (API + SPA + widget on one port), SQLite, Docker, publishable GHCR image |
 
@@ -109,7 +109,8 @@ The dashboard shows a ready-to-copy snippet for each project under **Projects** 
 
 Responsive React SPA served from the same port as the API.
 
-- **Items** — Bug/note/task list with type/status/priority filters, search, pagination, manual creation, and note-to-task triage for humans or AI agents. Detail view with screenshot lightbox, rrweb session player, notes timeline, related items, resolve modal
+- **Items** — Bug/note/task list with type/status/priority filters, search, pagination, manual creation, and note-to-task triage for humans or AI agents. Detail view with screenshot lightbox, rrweb session player, notes timeline, related items, linked runtime errors, resolve modal
+- **Errors** — Runtime error groups with environment/service/fingerprint, route template, status/error classification, occurrence counts, linked Scout item, and Grafana/Tempo context links when provided by integrations
 - **Projects** — CRUD with allowed origins for CORS/SSO and links to per-project integrations
 - **Users** — CRUD with system roles and per-project role assignment
 - **Webhooks** — Per-project event notifications (Slack-compatible)
@@ -138,9 +139,9 @@ User APIs use `projectRoles` for per-project access assignment.
 
 ## Agent Skill
 
-Scout also ships an installable agent skill for manual bug-tracker work. It is useful when a coding agent should take a Scout item, triage related items, reproduce the bug, fix it in a local repository, verify the result, and update Scout notes/statuses without relying on background automation.
+Scout also ships an installable agent skill for manual bug-tracker work. It is useful when a coding agent should take a Scout item, triage related items, inspect linked runtime error context when present, reproduce the bug, fix it in a local repository, verify the result, and update Scout notes/statuses without relying on background automation.
 
-For OpenCode users, Scout ships a single slash command: `/scout`. The agent infers single-item, full active queue, review/testing verification, or done-audit mode from the argument and live queue state. The command runs the full Scout workflow through `scout-manual-workflow` and can be installed globally with:
+For OpenCode users, Scout ships a single slash command: `/scout`. The agent infers single-item, full active queue, review/testing verification, runtime-error follow-up, or done-audit mode from the argument and live queue state. The command runs the full Scout workflow through `scout-manual-workflow` and can be installed globally with:
 
 ```bash
 ./scripts/install-opencode-commands.sh
@@ -182,6 +183,11 @@ Interactive docs: `https://your-scout.example/api/docs`
 | `/api/items/resolve` | Mark as done |
 | `/api/items/reopen` | Reopen `done`/`cancelled` items to `new` or `in_progress`; optional `reason`/`auditResult` records why |
 | `/api/items/link` | Link related/duplicate/blocking items |
+| `/api/v1/integrations/errors/upsert` | Create/update runtime error groups and link them to Scout items |
+| `/api/v1/integrations/errors/list` | List runtime error groups for a project |
+| `/api/v1/integrations/errors/get` | Get a runtime error group with linked item context |
+| `/api/v1/integrations/errors/bridge/alertmanager` | Alertmanager-compatible bridge webhook guarded by a shared secret |
+| `/api/v1/integrations/errors/bridge/health` | Bridge queue health and dead-letter counts |
 | `/api/auth/validate` | Validate token/API key |
 
 ## Deployment

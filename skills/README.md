@@ -4,11 +4,11 @@ This directory contains installable agent skills for working with Scout.
 
 ## `scout-manual-workflow`
 
-Use this skill when an AI coding agent should take a Scout item and handle it manually like a professional engineer: triage, reproduce, diagnose, fix, verify, update Scout notes/statuses, and handle related or duplicate items.
+Use this skill when an AI coding agent should take a Scout item and handle it manually like a professional engineer: triage, reproduce, diagnose, inspect linked runtime error context when present, fix, verify, update Scout notes/statuses, and handle related or duplicate items.
 
 ## OpenCode Commands
 
-Scout ships one OpenCode slash command in `.opencode/commands/`: `/scout`. It is a thin entrypoint into `scout-manual-workflow`; keep lifecycle rules in the skill and let the agent infer single-item, full active queue, review/testing verification, or done-audit mode from arguments and live queue state.
+Scout ships one OpenCode slash command in `.opencode/commands/`: `/scout`. It is a thin entrypoint into `scout-manual-workflow`; keep lifecycle rules in the skill and let the agent infer single-item, full active queue, review/testing verification, runtime-error follow-up, or done-audit mode from arguments and live queue state.
 
 The command works without arguments. Any text after `/scout` is an optional hint, item id, item URL, project, branch, deploy target, or scope, not a separate mode selector.
 
@@ -80,3 +80,5 @@ opencode
 ```
 
 Do not commit Scout API keys, cookies, JWTs, or environment files with real credentials.
+
+For runtime error group work, the agent key also needs the relevant `errors:*` scopes. Use `errors:read` for linked error inspection, `errors:triage` for ignore/unignore actions, and `errors:write` only for ingestion/upsert automation. The Alertmanager bridge shared secret is server-side integration material, not a normal manual-agent credential.

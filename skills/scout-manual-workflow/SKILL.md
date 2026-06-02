@@ -100,6 +100,8 @@ Read Scout access from environment variables first. If required variables are mi
 
 Agent keys should have only the scopes needed for manual issue work, such as reading items, adding notes, workflow/triage actions, related-item links, and reading storage evidence. Never commit Scout credentials, cookies, JWTs, API keys, `.env.local`, or generated credential files. Do not paste real secrets into documentation, PR bodies, issue text, or durable notes.
 
+For runtime error group work, include only the required `errors:*` scopes on the agent key: `errors:read` for inspection, `errors:triage` for ignore/unignore, and `errors:write` only for ingestion/upsert automation. The Alertmanager bridge shared secret is server-side integration material; do not use or expose it for normal manual Scout item work.
+
 Recommended shell prefix for Scout API calls when working from a repo root:
 
 ```bash
