@@ -11,6 +11,8 @@ import { userRoutes } from './routes/users.js';
 import { itemRoutes } from './routes/items.js';
 import { webhookRoutes } from './routes/webhooks.js';
 import { apiKeyRoutes } from './routes/api-keys.js';
+import { integrationsErrorsRoutes } from './routes/integrations-errors.js';
+import { startBridgeWorker } from './services/error-groups.js';
 import { eventRoutes } from './routes/events.js';
 import { docsRoutes } from './routes/docs.js';
 import { db, sqlite } from './db/client.js';
@@ -163,6 +165,7 @@ v1.route('/users', userRoutes);
 v1.route('/items', itemRoutes);
 v1.route('/webhooks', webhookRoutes);
 v1.route('/api-keys', apiKeyRoutes);
+v1.route('/integrations/errors', integrationsErrorsRoutes);
 
 // Mount v1 under /api/v1/
 app.route('/api/v1', v1);
@@ -348,9 +351,12 @@ serve({ fetch: app.fetch, port }, (info) => {
   logger.info({ port: info.port }, 'Scout started');
 });
 
+const stopBridgeWorker = startBridgeWorker();
+
 // Graceful shutdown
 function shutdown() {
   logger.info('Shutting down');
+  stopBridgeWorker();
   sqlite.close();
   process.exit(0);
 }

@@ -218,6 +218,9 @@ const apiKeyScopeEnum = z.enum([
   'items:workflow',
   'items:triage',
   'storage:read',
+  'errors:read',
+  'errors:write',
+  'errors:triage',
 ]);
 
 export const createApiKeySchema = z.object({
@@ -268,3 +271,76 @@ export const updateWebhookSchema = z.object({
 export const deleteWebhookSchema = z.object({ id: uuidSchema });
 export const listWebhooksSchema = z.object({ projectId: uuidSchema });
 export const testWebhookSchema = z.object({ id: uuidSchema });
+
+// === Error integrations ===
+const boundedUrlSchema = z.string().url().max(1000).optional();
+const errorSeveritySchema = z.enum(['info', 'warning', 'critical']);
+const errorStateSchema = z.enum(['active', 'ignored', 'resolved']);
+
+export const errorUpsertSchema = z.object({
+  projectId: uuidSchema.optional(),
+  projectSlug: z.string().min(1).max(80).optional(),
+  source: z.string().min(1).max(80).default('alertmanager'),
+  fingerprint: z.string().min(1).max(200),
+  environment: z.string().min(1).max(80),
+  service: z.string().min(1).max(120),
+  routeTemplate: z.string().max(300).optional(),
+  method: z.string().max(20).optional(),
+  upstreamService: z.string().max(120).optional(),
+  errorType: z.string().min(1).max(120),
+  statusCode: z.number().int().min(100).max(599).optional(),
+  statusClass: z.string().max(20).optional(),
+  severity: errorSeveritySchema.default('warning'),
+  occurredAt: z.string().datetime().optional(),
+  sampleRequestId: z.string().max(160).optional(),
+  sampleTraceId: z.string().max(160).optional(),
+  grafanaLogsUrl: boundedUrlSchema,
+  grafanaTraceUrl: boundedUrlSchema,
+  samplePayload: z.record(z.unknown()).optional(),
+  title: z.string().max(240).optional(),
+  message: z.string().max(4000).optional(),
+  release: z.string().max(120).optional(),
+  cooldownKey: z.string().max(120).optional(),
+}).refine((value) => value.projectId || value.projectSlug, {
+  message: 'projectId or projectSlug is required',
+  path: ['projectId'],
+});
+
+export const listErrorGroupsSchema = paginationSchema.extend({
+  projectId: uuidSchema,
+  state: errorStateSchema.optional(),
+  service: z.string().max(120).optional(),
+  environment: z.string().max(80).optional(),
+  severity: errorSeveritySchema.optional(),
+  linkedItemId: uuidSchema.optional(),
+});
+
+export const getErrorGroupSchema = z.object({ id: uuidSchema });
+
+export const ignoreErrorGroupSchema = z.object({
+  id: uuidSchema,
+  ignoredUntil: z.string().datetime().optional(),
+  ignoreReason: z.string().min(1).max(1000),
+});
+
+export const unignoreErrorGroupSchema = z.object({ id: uuidSchema });
+
+export const alertmanagerWebhookSchema = z.object({
+  version: z.string().optional(),
+  groupKey: z.string().max(500).optional(),
+  status: z.enum(['firing', 'resolved']).optional(),
+  receiver: z.string().max(120).optional(),
+  groupLabels: z.record(z.string()).optional(),
+  commonLabels: z.record(z.string()).optional(),
+  commonAnnotations: z.record(z.string()).optional(),
+  externalURL: z.string().max(1000).optional(),
+  alerts: z.array(z.object({
+    status: z.enum(['firing', 'resolved']),
+    labels: z.record(z.string()).default({}),
+    annotations: z.record(z.string()).default({}),
+    startsAt: z.string().optional(),
+    endsAt: z.string().optional(),
+    generatorURL: z.string().max(1000).optional(),
+    fingerprint: z.string().max(200).optional(),
+  })).min(1).max(50),
+});

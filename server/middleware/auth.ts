@@ -20,7 +20,10 @@ export type ApiKeyScope =
   | 'items:comment'
   | 'items:workflow'
   | 'items:triage'
-  | 'storage:read';
+  | 'storage:read'
+  | 'errors:read'
+  | 'errors:write'
+  | 'errors:triage';
 
 export function getApiKeyScopes(apiKey: Pick<ApiKey, 'scopes'> | null | undefined): ApiKeyScope[] {
   if (!apiKey) return [];
@@ -33,7 +36,10 @@ export function getApiKeyScopes(apiKey: Pick<ApiKey, 'scopes'> | null | undefine
       scope === 'items:comment' ||
       scope === 'items:workflow' ||
       scope === 'items:triage' ||
-      scope === 'storage:read',
+      scope === 'storage:read' ||
+      scope === 'errors:read' ||
+      scope === 'errors:write' ||
+      scope === 'errors:triage',
     );
   } catch {
     return [];

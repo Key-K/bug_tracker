@@ -11,14 +11,17 @@ export type ProjectPermission =
   | 'comment'
   | 'workflow'
   | 'triage'
+  | 'read_errors'
+  | 'write_errors'
+  | 'triage_errors'
   | 'manage_project'
   | 'manage_members'
   | 'manage_integrations';
 
 const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, ProjectPermission[]> = {
-  owner: ['view', 'create_item', 'comment', 'workflow', 'triage', 'manage_project', 'manage_members', 'manage_integrations'],
-  manager: ['view', 'create_item', 'comment', 'workflow', 'triage', 'manage_integrations'],
-  developer: ['view', 'comment', 'workflow'],
+  owner: ['view', 'create_item', 'comment', 'workflow', 'triage', 'read_errors', 'write_errors', 'triage_errors', 'manage_project', 'manage_members', 'manage_integrations'],
+  manager: ['view', 'create_item', 'comment', 'workflow', 'triage', 'read_errors', 'write_errors', 'triage_errors', 'manage_integrations'],
+  developer: ['view', 'comment', 'workflow', 'read_errors'],
   reporter: ['view', 'create_item', 'comment'],
   viewer: ['view'],
 };
@@ -29,6 +32,9 @@ const API_KEY_PERMISSION_SCOPES: Record<ProjectPermission, ApiKeyScope[]> = {
   comment: ['items:comment'],
   workflow: ['items:workflow'],
   triage: ['items:triage'],
+  read_errors: ['errors:read'],
+  write_errors: ['errors:write'],
+  triage_errors: ['errors:triage'],
   manage_project: [],
   manage_members: [],
   manage_integrations: [],

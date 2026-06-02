@@ -14,7 +14,7 @@ import { logAudit, getClientIp } from '../services/audit.js';
 const DEFAULT_SCOPES_BY_PURPOSE = {
   agent: ['items:read', 'items:comment', 'items:workflow', 'items:triage', 'storage:read'],
   ci: ['items:read', 'items:comment'],
-  integration: ['items:read', 'items:create'],
+  integration: ['items:read', 'items:create', 'errors:read', 'errors:write'],
   custom: ['items:read'],
 } as const;
 

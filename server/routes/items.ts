@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { eq, and, desc, count, like, or, inArray } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { scoutItems, scoutItemNotes, scoutItemEvidence, scoutItemLinks, projects, users, type ApiKey, type ScoutItemLink } from '../db/schema.js';
+import { scoutItems, scoutItemNotes, scoutItemEvidence, scoutItemLinks, projects, users, errorGroups, type ApiKey, type ScoutItemLink } from '../db/schema.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { checkProjectAccess, hasProjectPermission, requireProjectPermission } from '../middleware/permissions.js';
 import { randomUUID } from 'node:crypto';
@@ -192,6 +192,7 @@ export const itemRoutes = new Hono()
           ...enrichItem(item),
           notes: enrichedNotes,
           evidence: getItemEvidence(id),
+          errorGroups: db.select().from(errorGroups).where(eq(errorGroups.linkedItemId, id)).orderBy(desc(errorGroups.lastSeenAt)).all(),
           relatedItems: getRelatedItems(id),
           permissions: getItemPermissions(item, user, c.get('apiKey')),
         },

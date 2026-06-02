@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, index, primaryKey } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, index, primaryKey, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
 // === Audit Log ===
@@ -154,6 +154,74 @@ export const scoutItemLinks = sqliteTable('scout_item_links', {
   index('idx_item_links_source_target_type').on(table.sourceItemId, table.targetItemId, table.type),
 ]);
 
+// === Error Groups ===
+export const errorGroups = sqliteTable('error_groups', {
+  id: text('id').primaryKey(),
+  projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  source: text('source').notNull(),
+  fingerprint: text('fingerprint').notNull(),
+  environment: text('environment').notNull(),
+  service: text('service').notNull(),
+  routeTemplate: text('route_template'),
+  method: text('method'),
+  upstreamService: text('upstream_service'),
+  errorType: text('error_type').notNull(),
+  statusCode: integer('status_code'),
+  statusClass: text('status_class'),
+  severity: text('severity', { enum: ['info', 'warning', 'critical'] }).notNull().default('warning'),
+  state: text('state', { enum: ['active', 'ignored', 'resolved'] }).notNull().default('active'),
+  occurrenceCount: integer('occurrence_count').notNull().default(1),
+  firstSeenAt: text('first_seen_at').notNull(),
+  lastSeenAt: text('last_seen_at').notNull(),
+  linkedItemId: text('linked_item_id').references(() => scoutItems.id, { onDelete: 'set null' }),
+  ignoredUntil: text('ignored_until'),
+  ignoreReason: text('ignore_reason'),
+  sampleRequestId: text('sample_request_id'),
+  sampleTraceId: text('sample_trace_id'),
+  grafanaLogsUrl: text('grafana_logs_url'),
+  grafanaTraceUrl: text('grafana_trace_url'),
+  samplePayload: text('sample_payload'),
+  lastRelease: text('last_release'),
+  lastRegressionAt: text('last_regression_at'),
+  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
+}, (table) => [
+  uniqueIndex('idx_error_groups_project_env_fingerprint_unique').on(table.projectId, table.environment, table.fingerprint),
+  index('idx_error_groups_project_state').on(table.projectId, table.state),
+  index('idx_error_groups_project_service').on(table.projectId, table.service),
+  index('idx_error_groups_linked_item').on(table.linkedItemId),
+]);
+
+export const errorGroupOccurrences = sqliteTable('error_group_occurrences', {
+  id: text('id').primaryKey(),
+  errorGroupId: text('error_group_id').notNull().references(() => errorGroups.id, { onDelete: 'cascade' }),
+  occurredAt: text('occurred_at').notNull(),
+  requestId: text('request_id'),
+  traceId: text('trace_id'),
+  statusCode: integer('status_code'),
+  samplePayload: text('sample_payload'),
+  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+}, (table) => [
+  index('idx_error_occurrences_group_created').on(table.errorGroupId, table.createdAt),
+]);
+
+export const scoutBridgeJobs = sqliteTable('scout_bridge_jobs', {
+  id: text('id').primaryKey(),
+  eventId: text('event_id').notNull(),
+  source: text('source').notNull().default('alertmanager'),
+  status: text('status', { enum: ['pending', 'processing', 'delivered', 'failed', 'dead'] }).notNull().default('pending'),
+  attempts: integer('attempts').notNull().default(0),
+  nextAttemptAt: text('next_attempt_at').notNull(),
+  processingStartedAt: text('processing_started_at'),
+  lastError: text('last_error'),
+  payload: text('payload').notNull(),
+  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
+}, (table) => [
+  uniqueIndex('idx_scout_bridge_jobs_event_unique').on(table.eventId),
+  index('idx_scout_bridge_jobs_status_next').on(table.status, table.nextAttemptAt),
+]);
+
 // === Webhooks ===
 export const webhooks = sqliteTable('webhooks', {
   id: text('id').primaryKey(),
@@ -199,6 +267,10 @@ export type NewScoutItem = typeof scoutItems.$inferInsert;
 export type ScoutItemNote = typeof scoutItemNotes.$inferSelect;
 export type ScoutItemEvidence = typeof scoutItemEvidence.$inferSelect;
 export type ScoutItemLink = typeof scoutItemLinks.$inferSelect;
+export type ErrorGroup = typeof errorGroups.$inferSelect;
+export type NewErrorGroup = typeof errorGroups.$inferInsert;
+export type ErrorGroupOccurrence = typeof errorGroupOccurrences.$inferSelect;
+export type ScoutBridgeJob = typeof scoutBridgeJobs.$inferSelect;
 export type AuditLogEntry = typeof auditLog.$inferSelect;
 export type Webhook = typeof webhooks.$inferSelect;
 export type ApiKey = typeof apiKeys.$inferSelect;
@@ -215,5 +287,7 @@ export const WEBHOOK_EVENT_TYPES = [
   'item.assigned',
   'item.commented',
   'item.deleted',
+  'error_group.created',
+  'error_group.updated',
 ] as const;
 export type WebhookEventType = typeof WEBHOOK_EVENT_TYPES[number];

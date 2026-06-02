@@ -5,6 +5,7 @@ import Layout from './components/Layout';
 import Login from './pages/Login';
 import Items from './pages/Items';
 import ItemDetail from './pages/ItemDetail';
+import ErrorGroups from './pages/ErrorGroups';
 import Projects from './pages/Projects';
 import ProjectIntegrations from './pages/ProjectIntegrations';
 import Users from './pages/Users';
@@ -34,6 +35,7 @@ export default function App() {
             <Route index element={<Navigate to="/items" replace />} />
             <Route path="items" element={<Items />} />
             <Route path="items/:id" element={<ItemDetail />} />
+            <Route path="errors" element={<ErrorGroups />} />
             <Route path="projects" element={<Projects />} />
             <Route path="projects/:id/integrations" element={<ProjectIntegrations />} />
             <Route path="webhooks" element={<Webhooks />} />
