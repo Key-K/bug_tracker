@@ -92,7 +92,7 @@ Ask the user only for real blockers:
 
 ## Configuration
 
-Read Scout access from environment variables first. If required variables are missing, check the current workspace for a local `.env` file and source it inside the Scout command without printing secret values. This is the default for repos where `.env` is intentionally local and gitignored; do not ask the user for Scout credentials until both exported env vars and the local `.env` fallback have been checked.
+Read Scout access from environment variables first. If required variables are missing, check the current workspace for a local `.env` file and source it inside the Scout command process. This is the default for repos where `.env` is intentionally local and gitignored; do not ask the user for Scout credentials until both exported env vars and the local `.env` fallback have been checked.
 
 - `SCOUT_URL`: Scout base URL, for example `https://your-scout.example`.
 - `SCOUT_API_KEY`: project-scoped API key in `sk_live_*` format. Prefer a key created from Scout via `Projects` → target project → `Manage integrations` → `Create agent key`.
@@ -110,7 +110,7 @@ set -a
 set +a
 ```
 
-Use that prefix only inside the command process. Do not echo `SCOUT_API_KEY`, tokens, cookies, or `.env` contents. It is fine to print `present`/`missing` for variable diagnostics.
+Use that prefix only inside the command process. Keep `SCOUT_API_KEY`, tokens, cookies, and `.env` contents out of durable artifacts, Scout notes, commits, docs, and routine progress updates. Do not narrate this handling; mention only missing/invalid access, a blocker, or a value the user explicitly asked to see in the private chat. It is fine to print `present`/`missing` for variable diagnostics.
 
 ## Intake
 

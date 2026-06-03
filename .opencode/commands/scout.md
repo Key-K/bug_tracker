@@ -28,7 +28,7 @@ Boundaries:
 - Do not deploy if repo policy forbids it, credentials are missing, the target is production, or the canonical staging path is absent or failing.
 - Do not push protected production branches or deploy production unless repo workflow and the user's request explicitly allow it.
 - Do not mark `done` just because code changed, checks passed, or deploy succeeded.
-- Do not expose secrets in chat, Scout notes, evidence, commits, or docs.
-- Do not paste raw private runtime payloads, secret-bearing Grafana URLs, cookies, tokens, or auth headers from error evidence into Scout notes or final output.
+- Keep secrets out of Scout notes, evidence, commits, docs, and routine chat; exact private values may be shown only when the user explicitly asks for them in the current chat.
+- Do not paste raw private runtime payloads, secret-bearing Grafana URLs, cookies, tokens, or auth headers from error evidence into Scout notes or final output unless the exact value is explicitly requested and necessary.
 
 Final response: concise evidence summary, final queue/status counts, items moved with statuses, commits/PRs/deploys if any, exact blockers, and whether actionable work remains.
