@@ -139,7 +139,7 @@ User APIs use `projectRoles` for per-project access assignment.
 
 ## Agent Skill
 
-Scout also ships an installable agent skill for manual bug-tracker work. It is useful when a coding agent should take a Scout item, triage related items, inspect linked runtime error context when present, reproduce the bug, fix it in a local repository, verify the result, and update Scout notes/statuses without relying on background automation.
+Scout also ships an installable agent skill for manual bug-tracker work. It is useful when a coding agent should take a Scout item, triage related items, inspect linked runtime error context when present, reproduce the bug, fix it in a local repository, verify the result, and update Scout notes/statuses with structured evidence without relying on background automation.
 
 For OpenCode users, Scout ships a single slash command: `/scout`. The agent infers single-item, full active queue, review/testing verification, runtime-error follow-up, or done-audit mode from the argument and live queue state. The command runs the full Scout workflow through `scout-manual-workflow` and can be installed globally with:
 
@@ -180,6 +180,8 @@ Interactive docs: `https://your-scout.example/api/docs`
 | `/api/items/list` | List items (filtered) |
 | `/api/items/get` | Get item with notes, related items, and current-user permissions |
 | `/api/items/claim` | Assign to self |
+| `/api/items/update-status` | Move an item through workflow states with structured evidence when required |
+| `/api/items/add-evidence` | Add structured handoff, verification, audit, or blocker evidence |
 | `/api/items/resolve` | Mark as done |
 | `/api/items/reopen` | Reopen `done`/`cancelled` items to `new` or `in_progress`; optional `reason`/`auditResult` records why |
 | `/api/items/link` | Link related/duplicate/blocking items |

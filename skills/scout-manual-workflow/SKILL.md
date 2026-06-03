@@ -319,9 +319,10 @@ Rules:
 3. For `review`, evidence must be `result:"pass"` and include a real `commitSha` or real `mrUrl`; otherwise keep the item in `in_progress` with a blocker/progress note.
 4. For `done`, evidence must be `result:"pass"` with target acceptance: `local_acceptance` only when the item/project/user explicitly accepts local as the target, otherwise `staging_acceptance`, `production_acceptance`, or `user_acceptance`.
 5. Generic route sweeps, cluster checks, and API smoke can support a transition, but cannot replace item-specific acceptance unless `coverage:"shared_root_cluster"` names exactly how this item is covered.
-6. Before moving more than three items in one run, build a per-item readiness matrix: item id, original acceptance, evidence level, coverage, result, unchecked risks, and next honest status.
-7. If acceptance cannot be safely checked, create `blocker` evidence or a blocker note and keep/reopen the item according to reality. Do not convert blocked work to pass.
-8. When using the API, either call `/api/items/add-evidence` before the status change or include the `evidence` object in `/api/items/update-status` or `/api/items/resolve`.
+6. For shared-root evidence, do not close a related item as `done` unless that item's original acceptance path or a documented equivalent was replayed. A root-cause/API check without the related user journey is at most `review` with explicit `uncheckedRisks`.
+7. Before moving more than three items in one run, build a per-item readiness matrix: item id, original acceptance, evidence level, coverage, result, unchecked risks, and next honest status.
+8. If acceptance cannot be safely checked, create `blocker` evidence or a blocker note and keep/reopen the item according to reality. Do not convert blocked work to pass.
+9. When using the API, either call `/api/items/add-evidence` before the status change or include the `evidence` object in `/api/items/update-status` or `/api/items/resolve`.
 
 ## Compact Regression Matrix
 
@@ -599,6 +600,8 @@ Final user response must be short and evidence-based:
 
 All API calls are `POST` JSON unless retrieving storage assets. Authenticate with `Authorization: Bearer $SCOUT_API_KEY`.
 
+Current list endpoints return arrays under `data.items`. When operating against an older or unknown Scout server, inspect the first response once and normalize arrays with `(.data.items // .items // [])` instead of hardcoding an unverified response shape.
+
 List projects:
 
 ```bash
@@ -715,13 +718,52 @@ Update status after a local commit without PR/MR:
 set -a
 [ ! -f ./.env ] || . ./.env
 set +a
-curl -fsS "$SCOUT_URL/api/items/update-status" \
+jq -n \
+  --arg id "<CHANGE-ME-item-id>" \
+  --arg branchName "<CHANGE-ME-branch>" \
+  --arg environment "local" \
+  --arg scenario "<CHANGE-ME-scenario>" \
+  --arg action "<CHANGE-ME-action>" \
+  --arg visibleResult "<CHANGE-ME-result>" \
+  --arg acceptanceScope "<CHANGE-ME-item-specific-acceptance>" \
+  --arg consoleResult "<CHANGE-ME-console>" \
+  --arg networkResult "<CHANGE-ME-network>" \
+  --arg commitSha "<CHANGE-ME-commit>" \
+  '{id:$id,status:"review",branchName:$branchName,evidence:{kind:"handoff",result:"pass",level:"browser_acceptance",coverage:"item",environment:$environment,scenario:$scenario,action:$action,visibleResult:$visibleResult,acceptanceScope:$acceptanceScope,consoleResult:$consoleResult,networkResult:$networkResult,commitSha:$commitSha,source:"agent",verifiedAt:now|todateiso8601}}' \
+| curl -fsS "$SCOUT_URL/api/items/update-status" \
   -H "Authorization: Bearer $SCOUT_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"id":"<CHANGE-ME-item-id>","status":"review","branchName":"<CHANGE-ME-branch>","evidence":{"kind":"handoff","result":"pass","level":"browser_acceptance","coverage":"item","environment":"local","scenario":"<CHANGE-ME-scenario>","action":"<CHANGE-ME-action>","visibleResult":"<CHANGE-ME-result>","acceptanceScope":"<CHANGE-ME-item-specific-acceptance>","consoleResult":"<CHANGE-ME-console>","networkResult":"<CHANGE-ME-network>","commitSha":"<CHANGE-ME-commit>","source":"agent","verifiedAt":"<CHANGE-ME-ISO-time>"}}'
+  --data-binary @-
 ```
 
 If a PR/MR exists, include `mrUrl` only as the real PR/MR URL, not as a commit label or plain SHA.
+
+Resolve an item to `done` after target-environment acceptance:
+
+```bash
+set -a
+[ ! -f ./.env ] || . ./.env
+set +a
+jq -n \
+  --arg id "<CHANGE-ME-item-id>" \
+  --arg resolutionNote "<CHANGE-ME-russian-completion-note>" \
+  --arg environment "staging" \
+  --arg role "<CHANGE-ME-role>" \
+  --arg url "<CHANGE-ME-checked-url>" \
+  --arg scenario "<CHANGE-ME-acceptance-scenario>" \
+  --arg action "<CHANGE-ME-action-performed>" \
+  --arg visibleResult "<CHANGE-ME-observed-result>" \
+  --arg acceptanceScope "<CHANGE-ME-item-specific-acceptance>" \
+  --arg consoleResult "<CHANGE-ME-console-result>" \
+  --arg networkResult "<CHANGE-ME-network-result>" \
+  --arg commitSha "<CHANGE-ME-commit>" \
+  --arg deploySha "<CHANGE-ME-deploy>" \
+  '{id:$id,resolutionNote:$resolutionNote,evidence:{kind:"verification",result:"pass",level:"staging_acceptance",coverage:"item",environment:$environment,role:$role,url:$url,scenario:$scenario,action:$action,visibleResult:$visibleResult,acceptanceScope:$acceptanceScope,consoleResult:$consoleResult,networkResult:$networkResult,commitSha:$commitSha,deploySha:$deploySha,source:"agent",verifiedAt:now|todateiso8601}}' \
+| curl -fsS "$SCOUT_URL/api/items/resolve" \
+  -H "Authorization: Bearer $SCOUT_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @-
+```
 
 Reopen a `done` or `cancelled` item after failed audit/verification:
 

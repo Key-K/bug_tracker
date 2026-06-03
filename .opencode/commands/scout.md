@@ -16,7 +16,7 @@ Default goal: finish active Scout work systemically, not cosmetically. Inspect `
 Status rules:
 - `new`/actionable `note` -> `in_progress` only when active work starts.
 - `in_progress` -> `review` only after implementation, checks, browser/runtime verification when relevant, focused commit/PR reference, Russian handoff note, and structured evidence with `result`, `level`, `coverage`, `acceptanceScope`, and commit/PR reference; prefer continuing through push, staging deploy, and staging verification before stopping at `review` when that path is available and safe.
-- `review`/`testing` -> `done` only after target-environment, staging, production, or explicit user acceptance with fresh per-item evidence.
+- `review`/`testing` -> `done` only after target-environment, staging, production, or explicit user acceptance with fresh per-item evidence; use schema-complete `resolve` evidence, and keep shared-root-only coverage below `done` until the related item's acceptance path is covered.
 - After local completion, prefer `commit -> push -> staging deploy -> staging verification` before final handoff; if any step is unavailable, unsafe, or fails, record the exact blocker/failure and use the furthest honest status.
 - Weak, failing, stale, generic, route-sweep-only, or cluster-only evidence keeps or returns the item to `in_progress` with a clear Russian blocker/failure note.
 - `testing` is only for active target-environment verification, never parking.
