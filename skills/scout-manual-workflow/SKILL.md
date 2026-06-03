@@ -414,7 +414,8 @@ When updating Scout status after a local commit:
 
 1. Fill `mrUrl` only with a real PR/MR URL.
 2. If there is only a local commit SHA and no PR/MR, do not pass the SHA in `mrUrl`.
-3. Put the commit SHA in the Scout note, then call `update-status` with `branchName` and without `mrUrl`.
+3. Put the commit SHA in the Scout note, then call `update-status` with `branchName` and without `mrUrl` only when making a real valid status transition, normally `in_progress` -> `review`.
+4. Do not call `update-status` just to rewrite `branchName`, `mrUrl`, or evidence on an item that is already in the intended status. Use `/api/items/add-note` and `/api/items/add-evidence` for supplemental handoff details, and record that the visible branch field could not be changed without status churn.
 
 ## Batch Work And Staging
 
@@ -605,6 +606,8 @@ Final user response must be short and evidence-based:
 All API calls are `POST` JSON unless retrieving storage assets. Authenticate with `Authorization: Bearer $SCOUT_API_KEY`.
 
 Current list endpoints return arrays under `data.items`, including `/api/projects/list` and `/api/items/list`. When operating against an older or unknown Scout server, inspect the first response once and normalize arrays with `(.data.items // .items // [])` instead of hardcoding an unverified response shape.
+
+Scout API schemas use optional string fields, not nullable string fields. When building JSON payloads, omit absent optional strings instead of sending `null`, especially `role`, `url`, `consoleResult`, `networkResult`, `apiResult`, `dbResult`, `fixture`, `cleanupResult`, `commitSha`, `deploySha`, `risks`, `uncheckedRisks`, `branchName`, and `mrUrl`. Use `jq -n` with only populated `--arg` values or delete empty/null fields before sending.
 
 List projects:
 
