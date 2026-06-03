@@ -100,7 +100,15 @@ describe('Error integrations routes', () => {
 
   it('upsert creates error group and linked Scout item', async () => {
     const key = await createApiKey(['errors:write']);
-    const res = await upsert({ ...basePayload, projectId: ctx.projectId }, key);
+    const res = await upsert({
+      ...basePayload,
+      projectId: ctx.projectId,
+      samplePayload: {
+        Authorization: 'redaction-test-value',
+        url: 'https://example.test/path?token=redaction-url-secret',
+        safe: 'value',
+      },
+    }, key);
 
     expect(res.status).toBe(201);
     const body = await res.json() as any;
@@ -111,6 +119,7 @@ describe('Error integrations routes', () => {
     expect(item?.itemType).toBe('bug');
     expect(item?.labels).toContain('auto-created');
     expect(body.data.errorGroup.samplePayload).not.toContain('redaction-test-value');
+    expect(body.data.errorGroup.samplePayload).not.toContain('redaction-url-secret');
   });
 
   it('repeated upsert is idempotent and does not create duplicate item', async () => {
@@ -278,6 +287,19 @@ describe('Error integrations routes', () => {
     vi.stubEnv('SCOUT_ERROR_BRIDGE_SECRET', 'bridge-test-value');
     const res = await bridge(bridgePayload('test-project', 'bridge-valid-bearer'), 'bridge-test-value', true);
     expect(res.status).toBe(202);
+  });
+
+  it('does not create active error groups from resolved bridge alerts', async () => {
+    vi.stubEnv('SCOUT_ERROR_BRIDGE_SECRET', 'bridge-test-value');
+    const payload = bridgePayload('test-project', 'bridge-resolved-only');
+    payload.status = 'resolved';
+    payload.alerts[0]!.status = 'resolved';
+
+    const res = await bridge(payload, 'bridge-test-value');
+
+    expect(res.status).toBe(202);
+    expect(ctx.db.select().from(errorGroups).all()).toHaveLength(0);
+    expect(ctx.db.select().from(scoutItems).all()).toHaveLength(0);
   });
 
   it('does not print bridge secret in logs', async () => {

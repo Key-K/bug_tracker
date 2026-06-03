@@ -31,6 +31,7 @@ type ErrorUpsertInput = {
 };
 
 const SECRET_KEY_PATTERN = /(authorization|cookie|token|password|secret|key|credential|jwt)/i;
+const SECRET_VALUE_PATTERN = /(Bearer\s+)[A-Za-z0-9._~+/=-]+|((?:authorization|cookie|token|password|secret|key|credential|jwt)=)[^&\s,}]+/gi;
 const MAX_SAMPLE_JSON_LENGTH = 5000;
 const DEFAULT_OCCURRENCE_LIMIT = 100;
 const DEFAULT_REGRESSION_COOLDOWN_MS = 30 * 60 * 1000;
@@ -68,7 +69,9 @@ function redact(value: unknown): unknown {
       continue;
     }
     if (typeof item === 'string') {
-      result[key] = item.replace(/Bearer\s+[A-Za-z0-9._-]+/g, 'Bearer <redacted>').slice(0, 1000);
+      result[key] = item
+        .replace(SECRET_VALUE_PATTERN, (_match, bearerPrefix: string | undefined, keyPrefix: string | undefined) => `${bearerPrefix ?? keyPrefix}<redacted>`)
+        .slice(0, 1000);
       continue;
     }
     result[key] = redact(item);
@@ -308,33 +311,35 @@ export function enqueueBridgeJob(payload: unknown): { id: string; eventId: strin
 }
 
 export function normalizeAlertmanagerPayload(payload: any): ErrorUpsertInput[] {
-  return payload.alerts.map((alert: any) => {
-    const labels = { ...(payload.commonLabels || {}), ...(alert.labels || {}) };
-    const annotations = { ...(payload.commonAnnotations || {}), ...(alert.annotations || {}) };
-    const env = labels.env || labels.environment || 'unknown';
-    const service = labels.service || labels.job || 'unknown';
-    const alertname = labels.alertname || 'AlertmanagerAlert';
-    const fingerprint = alert.fingerprint || createHash('sha256').update(`${env}|${service}|${alertname}|${labels.route_template || ''}|${labels.error_type || ''}`).digest('hex');
-    return {
-      projectSlug: labels.project || labels.project_slug || 'avtozor',
-      source: 'alertmanager',
-      fingerprint,
-      environment: env,
-      service,
-      routeTemplate: labels.route_template,
-      method: labels.method,
-      upstreamService: labels.upstream_service,
-      errorType: labels.error_type || alertname,
-      statusClass: labels.status_class,
-      severity: labels.severity === 'critical' ? 'critical' : labels.severity === 'info' ? 'info' : 'warning',
-      occurredAt: alert.startsAt && !Number.isNaN(Date.parse(alert.startsAt)) ? new Date(alert.startsAt).toISOString() : now(),
-      grafanaLogsUrl: alert.generatorURL,
-      title: `[${env}][${service}] ${alertname}`,
-      message: annotations.summary || annotations.description,
-      release: labels.release || labels.deploy_sha || labels.deployment_sha,
-      samplePayload: { labels, annotations, status: alert.status, groupKey: payload.groupKey, externalURL: payload.externalURL },
-    };
-  });
+  return payload.alerts
+    .filter((alert: any) => alert.status === 'firing')
+    .map((alert: any) => {
+      const labels = { ...(payload.commonLabels || {}), ...(alert.labels || {}) };
+      const annotations = { ...(payload.commonAnnotations || {}), ...(alert.annotations || {}) };
+      const env = labels.env || labels.environment || 'unknown';
+      const service = labels.service || labels.job || 'unknown';
+      const alertname = labels.alertname || 'AlertmanagerAlert';
+      const fingerprint = alert.fingerprint || createHash('sha256').update(`${env}|${service}|${alertname}|${labels.route_template || ''}|${labels.error_type || ''}`).digest('hex');
+      return {
+        projectSlug: labels.project || labels.project_slug || 'avtozor',
+        source: 'alertmanager',
+        fingerprint,
+        environment: env,
+        service,
+        routeTemplate: labels.route_template,
+        method: labels.method,
+        upstreamService: labels.upstream_service,
+        errorType: labels.error_type || alertname,
+        statusClass: labels.status_class,
+        severity: labels.severity === 'critical' ? 'critical' : labels.severity === 'info' ? 'info' : 'warning',
+        occurredAt: alert.startsAt && !Number.isNaN(Date.parse(alert.startsAt)) ? new Date(alert.startsAt).toISOString() : now(),
+        grafanaLogsUrl: alert.generatorURL,
+        title: `[${env}][${service}] ${alertname}`,
+        message: annotations.summary || annotations.description,
+        release: labels.release || labels.deploy_sha || labels.deployment_sha,
+        samplePayload: { labels, annotations, status: alert.status, groupKey: payload.groupKey, externalURL: payload.externalURL },
+      };
+    });
 }
 
 export function processBridgeJobs(limit = DEFAULT_BRIDGE_BATCH_SIZE, currentTime = now()): { processed: number; failed: number; dead: number } {
