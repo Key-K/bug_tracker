@@ -24,6 +24,9 @@ interface Note {
 interface EvidenceRecord {
   id: string;
   kind: 'handoff' | 'verification' | 'audit' | 'blocker';
+  result: 'pass' | 'fail' | 'blocked' | 'partial' | null;
+  level: EvidenceLevel | null;
+  coverage: 'item' | 'shared_root_cluster' | 'route_sweep' | 'audit_sample' | null;
   environment: string;
   role: string | null;
   url: string | null;
@@ -39,14 +42,23 @@ interface EvidenceRecord {
   commitSha: string | null;
   deploySha: string | null;
   risks: string | null;
+  uncheckedRisks: string | null;
+  acceptanceScope: string | null;
+  source: 'agent' | 'human' | 'ci' | 'deploy' | 'audit' | null;
+  verifiedAt: string | null;
   userName: string | null;
   createdAt: string;
 }
 
 type HandoffStatus = 'review' | 'done';
+type EvidenceLevel = 'static' | 'typecheck' | 'api_smoke' | 'browser_smoke' | 'browser_acceptance' | 'local_acceptance' | 'staging_acceptance' | 'production_acceptance' | 'user_acceptance';
 
 type EvidenceDraft = {
   kind: 'handoff' | 'verification' | 'audit' | 'blocker';
+  result: 'pass' | 'fail' | 'blocked' | 'partial';
+  level: EvidenceLevel;
+  coverage: 'item' | 'shared_root_cluster' | 'route_sweep' | 'audit_sample';
+  source: 'agent' | 'human' | 'ci' | 'deploy' | 'audit';
   environment: string;
   role: string;
   url: string;
@@ -62,6 +74,8 @@ type EvidenceDraft = {
   commitSha: string;
   deploySha: string;
   risks: string;
+  uncheckedRisks: string;
+  acceptanceScope: string;
 };
 
 interface UserListItem {
@@ -180,6 +194,10 @@ const noteTypeColors: Record<string, string> = {
 
 const initialEvidenceDraft: EvidenceDraft = {
   kind: 'handoff',
+  result: 'pass',
+  level: 'local_acceptance',
+  coverage: 'item',
+  source: 'human',
   environment: '',
   role: '',
   url: '',
@@ -195,9 +213,23 @@ const initialEvidenceDraft: EvidenceDraft = {
   commitSha: '',
   deploySha: '',
   risks: '',
+  uncheckedRisks: '',
+  acceptanceScope: '',
 };
 
 const evidenceRequiredFields: Array<keyof EvidenceDraft> = ['environment', 'scenario', 'action', 'visibleResult'];
+const doneEvidenceLevels: EvidenceLevel[] = ['local_acceptance', 'staging_acceptance', 'production_acceptance', 'user_acceptance'];
+const evidenceLevels: EvidenceLevel[] = [
+  'static',
+  'typecheck',
+  'api_smoke',
+  'browser_smoke',
+  'browser_acceptance',
+  'local_acceptance',
+  'staging_acceptance',
+  'production_acceptance',
+  'user_acceptance',
+];
 
 function parseMetadata(raw: string | null): ParsedMetadata | null {
   if (!raw) return null;
@@ -492,17 +524,21 @@ export default function ItemDetail() {
   }
 
   function updateEvidenceField(field: keyof EvidenceDraft, value: string) {
-    setEvidenceDraft((current) => ({ ...current, [field]: value }));
+    setEvidenceDraft((current) => ({ ...current, [field]: value } as EvidenceDraft));
   }
 
   function buildEvidencePayload() {
     const entries = Object.entries(evidenceDraft)
       .map(([key, value]) => [key, value.trim()] as const)
       .filter(([, value]) => value.length > 0);
-    return Object.fromEntries(entries);
+    return { ...Object.fromEntries(entries), verifiedAt: new Date().toISOString() };
   }
 
-  const evidenceReady = evidenceRequiredFields.every((field) => evidenceDraft[field].trim().length > 0);
+  const baseEvidenceReady = evidenceRequiredFields.every((field) => evidenceDraft[field].trim().length > 0);
+  const passingEvidenceReady = evidenceDraft.result === 'pass';
+  const reviewEvidenceReady = handoffStatus !== 'review' || Boolean(evidenceDraft.commitSha.trim() || mrUrl.trim());
+  const doneEvidenceReady = handoffStatus !== 'done' || doneEvidenceLevels.includes(evidenceDraft.level);
+  const evidenceReady = baseEvidenceReady && passingEvidenceReady && reviewEvidenceReady && doneEvidenceReady;
 
   async function handleHandoff() {
     if (!item || !evidenceReady) return;
@@ -602,7 +638,7 @@ export default function ItemDetail() {
         id: item.id,
         itemType: editItemType,
         message: editMessage.trim(),
-        priority: editPriority,
+        ...(editItemType !== 'note' ? { priority: editPriority } : {}),
         labels: labelsArr,
       });
       setEditing(false);
@@ -1159,6 +1195,8 @@ export default function ItemDetail() {
                   <span className="rounded-full bg-gray-200 px-2 py-0.5 font-medium text-gray-700">
                     {t(`items.detail.evidence.kinds.${entry.kind}`)}
                   </span>
+                  {entry.result && <span>{t(`items.detail.evidence.results.${entry.result}`)}</span>}
+                  {entry.level && <span>{t(`items.detail.evidence.levels.${entry.level}`)}</span>}
                   <span>{entry.environment}</span>
                   {entry.role && <span>{entry.role}</span>}
                   <span>{entry.userName ?? 'System'}</span>
@@ -1166,8 +1204,11 @@ export default function ItemDetail() {
                 </div>
                 <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
                   <InfoRow label={t('items.detail.evidence.scenario')} value={entry.scenario} />
+                  <InfoRow label={t('items.detail.evidence.coverage')} value={entry.coverage ? t(`items.detail.evidence.coverageValues.${entry.coverage}`) : null} />
+                  <InfoRow label={t('items.detail.evidence.source')} value={entry.source ? t(`items.detail.evidence.sources.${entry.source}`) : null} />
                   <InfoRow label={t('items.detail.evidence.action')} value={entry.action} />
                   <InfoRow label={t('items.detail.evidence.visibleResult')} value={entry.visibleResult} />
+                  <InfoRow label={t('items.detail.evidence.acceptanceScope')} value={entry.acceptanceScope} />
                   <InfoRow label={t('items.detail.evidence.networkResult')} value={entry.networkResult} />
                   <InfoRow label={t('items.detail.evidence.consoleResult')} value={entry.consoleResult} />
                   <InfoRow label={t('items.detail.evidence.apiResult')} value={entry.apiResult} />
@@ -1177,6 +1218,8 @@ export default function ItemDetail() {
                   <InfoRow label={t('items.detail.evidence.commitSha')} value={entry.commitSha} mono />
                   <InfoRow label={t('items.detail.evidence.deploySha')} value={entry.deploySha} mono />
                   <InfoRow label={t('items.detail.evidence.risks')} value={entry.risks} />
+                  <InfoRow label={t('items.detail.evidence.uncheckedRisks')} value={entry.uncheckedRisks} />
+                  <InfoRow label={t('items.detail.evidence.verifiedAt')} value={entry.verifiedAt ? formatDate(entry.verifiedAt, locale) : null} />
                 </div>
               </div>
             ))}
@@ -1371,6 +1414,30 @@ export default function ItemDetail() {
             <p className="mb-4 text-sm text-gray-500">{t('items.detail.evidence.requiredHint')}</p>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <label className="block">
+                <span className="text-sm font-medium text-gray-700">{t('items.detail.evidence.result')} *</span>
+                <select
+                  value={evidenceDraft.result}
+                  onChange={(e) => updateEvidenceField('result', e.target.value)}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                >
+                  {(['pass', 'fail', 'blocked', 'partial'] as const).map((result) => (
+                    <option key={result} value={result}>{t(`items.detail.evidence.results.${result}`)}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-sm font-medium text-gray-700">{t('items.detail.evidence.level')} *</span>
+                <select
+                  value={evidenceDraft.level}
+                  onChange={(e) => updateEvidenceField('level', e.target.value)}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                >
+                  {evidenceLevels.map((level) => (
+                    <option key={level} value={level}>{t(`items.detail.evidence.levels.${level}`)}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
                 <span className="text-sm font-medium text-gray-700">{t('items.detail.evidence.environment')} *</span>
                 <input
                   type="text"
@@ -1389,6 +1456,32 @@ export default function ItemDetail() {
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   placeholder="admin / dealer / reporter"
                 />
+              </label>
+            </div>
+            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+              <label className="block">
+                <span className="text-sm font-medium text-gray-700">{t('items.detail.evidence.coverage')}</span>
+                <select
+                  value={evidenceDraft.coverage}
+                  onChange={(e) => updateEvidenceField('coverage', e.target.value)}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                >
+                  {(['item', 'shared_root_cluster', 'route_sweep', 'audit_sample'] as const).map((coverage) => (
+                    <option key={coverage} value={coverage}>{t(`items.detail.evidence.coverageValues.${coverage}`)}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-sm font-medium text-gray-700">{t('items.detail.evidence.source')}</span>
+                <select
+                  value={evidenceDraft.source}
+                  onChange={(e) => updateEvidenceField('source', e.target.value)}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                >
+                  {(['human', 'agent', 'ci', 'deploy', 'audit'] as const).map((source) => (
+                    <option key={source} value={source}>{t(`items.detail.evidence.sources.${source}`)}</option>
+                  ))}
+                </select>
               </label>
             </div>
             <label className="mt-3 block">
@@ -1428,13 +1521,13 @@ export default function ItemDetail() {
               />
             </label>
             <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
-              {(['consoleResult', 'networkResult', 'apiResult', 'dbResult', 'fixture', 'cleanupResult', 'commitSha', 'deploySha', 'risks'] as Array<keyof EvidenceDraft>).map((field) => (
+              {(['consoleResult', 'networkResult', 'apiResult', 'dbResult', 'fixture', 'cleanupResult', 'commitSha', 'deploySha', 'acceptanceScope', 'risks', 'uncheckedRisks'] as Array<keyof EvidenceDraft>).map((field) => (
                 <label key={field} className="block">
                   <span className="text-sm font-medium text-gray-700">{t(`items.detail.evidence.${field}`)}</span>
                   <textarea
                     value={evidenceDraft[field]}
                     onChange={(e) => updateEvidenceField(field, e.target.value)}
-                    rows={field === 'risks' ? 2 : 1}
+                    rows={field === 'risks' || field === 'uncheckedRisks' || field === 'acceptanceScope' ? 2 : 1}
                     className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   />
                 </label>

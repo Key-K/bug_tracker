@@ -586,18 +586,19 @@ export function attachPanelEvents(
       const body = {
         projectId,
         itemType: mode,
-        source: 'widget',
         message,
-        priority: mode === 'bug' ? elements.prioritySelect.value : 'medium',
         pageUrl: p.pageUrl,
-        cssSelector: mode === 'bug' ? p.cssSelector : undefined,
-        elementText: mode === 'bug' ? p.elementText : undefined,
-        elementHtml: mode === 'bug' ? p.elementHtml : undefined,
         viewportWidth: p.viewportWidth,
         viewportHeight: p.viewportHeight,
-        screenshot,
-        sessionRecording,
         metadata,
+        ...(mode === 'bug' ? {
+          priority: elements.prioritySelect.value,
+          cssSelector: p.cssSelector,
+          elementText: p.elementText,
+          elementHtml: p.elementHtml,
+          screenshot,
+          sessionRecording,
+        } : {}),
       };
 
       const res = await fetchWithRetry(

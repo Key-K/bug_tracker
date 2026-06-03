@@ -184,6 +184,12 @@ export function upsertErrorGroup(input: ErrorUpsertInput, resolvedProjectId?: st
       : null;
     const reopenAsRegression = shouldReopenRegression(existing, linkedItem, input, timestamp, ignoredActive);
     tx.update(errorGroups).set({
+      source: input.source,
+      service: input.service,
+      routeTemplate: input.routeTemplate ?? existing.routeTemplate,
+      method: input.method ?? existing.method,
+      upstreamService: input.upstreamService ?? existing.upstreamService,
+      errorType: input.errorType,
       occurrenceCount: existing.occurrenceCount + 1,
       lastSeenAt: timestamp,
       state: nextState,

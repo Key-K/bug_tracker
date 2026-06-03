@@ -73,7 +73,7 @@ export const webhookRoutes = new Hono()
         updatedAt: new Date().toISOString(),
       };
       if (url !== undefined) updateData.url = url;
-      if (secret !== undefined) updateData.secret = secret;
+      if (secret !== undefined) updateData.secret = secret ?? null;
       if (events !== undefined) updateData.events = JSON.stringify(events);
       if (isActive !== undefined) updateData.isActive = isActive;
 

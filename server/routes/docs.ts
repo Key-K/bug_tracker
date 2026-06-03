@@ -22,6 +22,7 @@ const spec = {
     { name: 'Users', description: 'Управление пользователями и project roles' },
     { name: 'Webhooks', description: 'Вебхуки для проектных интеграций' },
     { name: 'API Keys', description: 'Project-scoped API keys для программного доступа' },
+    { name: 'Error Integrations', description: 'Runtime error groups and observability bridge endpoints' },
     { name: 'Events', description: 'Server-Sent Events (SSE) для real-time обновлений' },
     { name: 'Health', description: 'Проверка состояния сервера' },
     { name: 'Docs', description: 'Документация API' },
@@ -79,7 +80,7 @@ const spec = {
       },
       WebhookEvent: {
         type: 'string',
-        enum: ['item.created', 'item.status_changed', 'item.assigned', 'item.commented', 'item.deleted'],
+        enum: ['item.created', 'item.status_changed', 'item.assigned', 'item.commented', 'item.deleted', 'error_group.created', 'error_group.updated'],
       },
       NoteType: {
         type: 'string',
@@ -153,7 +154,7 @@ const spec = {
           source: { $ref: '#/components/schemas/ItemSource' },
           message: { type: 'string' },
           status: { $ref: '#/components/schemas/ItemStatus' },
-          priority: { $ref: '#/components/schemas/ItemPriority' },
+          priority: { allOf: [{ $ref: '#/components/schemas/ItemPriority' }], nullable: true, description: 'Null for notes; required domain field for bugs/tasks' },
           labels: { type: 'string', nullable: true, description: 'JSON array of label strings' },
           metadata: { type: 'string', nullable: true, description: 'JSON object with environment data' },
           pageUrl: { type: 'string', nullable: true },
@@ -248,6 +249,41 @@ const spec = {
           source: { type: 'string', enum: ['agent', 'human', 'ci', 'deploy', 'audit'], nullable: true },
           verifiedAt: { type: 'string', format: 'date-time', nullable: true },
           createdAt: { type: 'string', format: 'date-time' },
+        },
+      },
+      ErrorGroup: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          projectId: { type: 'string', format: 'uuid' },
+          source: { type: 'string' },
+          fingerprint: { type: 'string' },
+          environment: { type: 'string' },
+          service: { type: 'string' },
+          routeTemplate: { type: 'string', nullable: true },
+          method: { type: 'string', nullable: true },
+          upstreamService: { type: 'string', nullable: true },
+          errorType: { type: 'string' },
+          statusCode: { type: 'integer', nullable: true },
+          statusClass: { type: 'string', nullable: true },
+          severity: { type: 'string', enum: ['info', 'warning', 'critical'] },
+          state: { type: 'string', enum: ['active', 'ignored', 'resolved'] },
+          occurrenceCount: { type: 'integer' },
+          firstSeenAt: { type: 'string', format: 'date-time' },
+          lastSeenAt: { type: 'string', format: 'date-time' },
+          linkedItemId: { type: 'string', format: 'uuid', nullable: true },
+          linkedItemMessage: { type: 'string', nullable: true },
+          ignoredUntil: { type: 'string', format: 'date-time', nullable: true },
+          ignoreReason: { type: 'string', nullable: true },
+          sampleRequestId: { type: 'string', nullable: true },
+          sampleTraceId: { type: 'string', nullable: true },
+          grafanaLogsUrl: { type: 'string', nullable: true },
+          grafanaTraceUrl: { type: 'string', nullable: true },
+          samplePayload: { type: 'string', nullable: true },
+          lastRelease: { type: 'string', nullable: true },
+          lastRegressionAt: { type: 'string', format: 'date-time', nullable: true },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' },
         },
       },
       Webhook: {
@@ -384,7 +420,7 @@ const spec = {
         tags: ['Auth'],
         summary: 'Текущий пользователь',
         description: 'Возвращает данные текущего авторизованного пользователя.',
-        security: [{ BearerAuth: [] }],
+        security: [{ BearerAuth: [] }, { ApiKeyAuth: [] }],
         responses: {
           200: {
             description: 'Данные пользователя',
@@ -493,9 +529,8 @@ const spec = {
                 properties: {
                   projectId: { type: 'string', format: 'uuid' },
                   itemType: { $ref: '#/components/schemas/ItemType', default: 'bug' },
-                  source: { $ref: '#/components/schemas/ItemSource', default: 'widget' },
                   message: { type: 'string', minLength: 3 },
-                  priority: { $ref: '#/components/schemas/ItemPriority', default: 'medium' },
+                  priority: { $ref: '#/components/schemas/ItemPriority', default: 'medium', description: 'Ignored and stored as null for notes' },
                   labels: { type: 'array', items: { type: 'string', maxLength: 50 }, maxItems: 10 },
                   pageUrl: { type: 'string', maxLength: 500, nullable: true },
                   pageRoute: { type: 'string', maxLength: 255, nullable: true },
@@ -533,7 +568,7 @@ const spec = {
         tags: ['Items'],
         summary: 'Список items',
         description: 'Пагинированный список items проекта с фильтрацией. Требуется доступ к проекту.',
-        security: [{ BearerAuth: [] }],
+        security: [{ BearerAuth: [] }, { ApiKeyAuth: [] }],
         requestBody: {
           required: true,
           content: {
@@ -584,7 +619,7 @@ const spec = {
       post: {
         tags: ['Items'],
         summary: 'Получить item с заметками и evidence',
-        description: 'Возвращает item, заметки, structured evidence, связанные items и permissions текущего пользователя. Требуется доступ к проекту.',
+        description: 'Возвращает item, заметки, structured evidence, связанные items, linked runtime error groups и permissions текущего пользователя. Требуется доступ к проекту.',
         security: [{ BearerAuth: [] }, { ApiKeyAuth: [] }],
         requestBody: {
           required: true,
@@ -616,6 +651,7 @@ const spec = {
                           properties: {
                             notes: { type: 'array', items: { $ref: '#/components/schemas/ItemNote' } },
                             evidence: { type: 'array', items: { $ref: '#/components/schemas/ItemEvidence' } },
+                            errorGroups: { type: 'array', items: { $ref: '#/components/schemas/ErrorGroup' } },
                             relatedItems: { type: 'array', items: { $ref: '#/components/schemas/RelatedItem' } },
                             permissions: { $ref: '#/components/schemas/ItemPermissions' },
                           },
@@ -647,7 +683,6 @@ const spec = {
                 properties: {
                   projectId: { type: 'string', format: 'uuid' },
                   itemType: { $ref: '#/components/schemas/ItemType' },
-                  status: { $ref: '#/components/schemas/ItemStatus' },
                 },
               },
             },
@@ -670,6 +705,7 @@ const spec = {
                             new: { type: 'integer' },
                             in_progress: { type: 'integer' },
                             review: { type: 'integer' },
+                            testing: { type: 'integer' },
                             done: { type: 'integer' },
                             cancelled: { type: 'integer' },
                           },
@@ -689,7 +725,7 @@ const spec = {
         tags: ['Items'],
         summary: 'Взять item в работу',
         description: 'Назначает текущего пользователя исполнителем и переводит статус в in_progress. Требуется project permission `workflow` (admin/owner/manager/developer).',
-        security: [{ BearerAuth: [] }, { ApiKeyAuth: [] }],
+        security: [{ BearerAuth: [] }],
         requestBody: {
           required: true,
           content: {
@@ -719,7 +755,7 @@ const spec = {
         tags: ['Items'],
         summary: 'Закрыть item (resolve)',
         description: 'Переводит item в статус done. Для done/review требуется свежий structured evidence record или evidence в этом запросе. Agent automation should include result, level, coverage, environment, scenario, action, visibleResult, and item-specific acceptanceScope. Требуется project permission `workflow` (admin/owner/manager/developer).',
-        security: [{ BearerAuth: [] }, { ApiKeyAuth: [] }],
+        security: [{ BearerAuth: [] }],
         requestBody: {
           required: true,
           content: {
@@ -753,7 +789,7 @@ const spec = {
         tags: ['Items'],
         summary: 'Отменить item',
         description: 'Переводит item в статус cancelled. Требуется project permission `triage`; reporter может отменить свой `new` item.',
-        security: [{ BearerAuth: [] }, { ApiKeyAuth: [] }],
+        security: [{ BearerAuth: [] }],
         requestBody: {
           required: true,
           content: {
@@ -1725,6 +1761,135 @@ const spec = {
           403: { description: 'Недостаточно прав', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
           404: { description: 'API-ключ не найден', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
         },
+      },
+    },
+
+    // ═══════════════════════ Error Integrations ═══════════════════════
+    '/integrations/errors/upsert': {
+      post: {
+        tags: ['Error Integrations'],
+        summary: 'Create or update runtime error group',
+        description: 'Upserts an error group and linked Scout item from observability/runtime data. Requires `write_errors` project permission or API key scope `errors:write`.',
+        security: [{ BearerAuth: [] }, { ApiKeyAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['fingerprint', 'environment', 'service', 'errorType'],
+                properties: {
+                  projectId: { type: 'string', format: 'uuid' },
+                  projectSlug: { type: 'string' },
+                  source: { type: 'string', default: 'alertmanager' },
+                  fingerprint: { type: 'string', maxLength: 200 },
+                  environment: { type: 'string', maxLength: 80 },
+                  service: { type: 'string', maxLength: 120 },
+                  routeTemplate: { type: 'string', maxLength: 300 },
+                  method: { type: 'string', maxLength: 20 },
+                  upstreamService: { type: 'string', maxLength: 120 },
+                  errorType: { type: 'string', maxLength: 120 },
+                  statusCode: { type: 'integer', minimum: 100, maximum: 599 },
+                  statusClass: { type: 'string', maxLength: 20 },
+                  severity: { type: 'string', enum: ['info', 'warning', 'critical'], default: 'warning' },
+                  occurredAt: { type: 'string', format: 'date-time' },
+                  sampleRequestId: { type: 'string', maxLength: 160 },
+                  sampleTraceId: { type: 'string', maxLength: 160 },
+                  grafanaLogsUrl: { type: 'string', format: 'uri' },
+                  grafanaTraceUrl: { type: 'string', format: 'uri' },
+                  samplePayload: { type: 'object', additionalProperties: true },
+                  title: { type: 'string', maxLength: 240 },
+                  message: { type: 'string', maxLength: 4000 },
+                  release: { type: 'string', maxLength: 120 },
+                  cooldownKey: { type: 'string', maxLength: 120 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'Error group updated', content: { 'application/json': { schema: { type: 'object', properties: { data: { type: 'object', properties: { errorGroup: { $ref: '#/components/schemas/ErrorGroup' } } } } } } } },
+          201: { description: 'Error group created', content: { 'application/json': { schema: { type: 'object', properties: { data: { type: 'object', properties: { errorGroup: { $ref: '#/components/schemas/ErrorGroup' } } } } } } } },
+        },
+      },
+    },
+    '/integrations/errors/list': {
+      post: {
+        tags: ['Error Integrations'],
+        summary: 'List runtime error groups',
+        description: 'Lists error groups for a project. Requires project access or API key scope `items:read`/project match.',
+        security: [{ BearerAuth: [] }, { ApiKeyAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['projectId'],
+                properties: {
+                  projectId: { type: 'string', format: 'uuid' },
+                  state: { type: 'string', enum: ['active', 'ignored', 'resolved'] },
+                  service: { type: 'string', maxLength: 120 },
+                  environment: { type: 'string', maxLength: 80 },
+                  severity: { type: 'string', enum: ['info', 'warning', 'critical'] },
+                  linkedItemId: { type: 'string', format: 'uuid' },
+                  page: { type: 'integer', minimum: 1, default: 1 },
+                  perPage: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'Error groups', content: { 'application/json': { schema: { type: 'object', properties: { data: { type: 'object', properties: { items: { type: 'array', items: { $ref: '#/components/schemas/ErrorGroup' } }, pagination: { $ref: '#/components/schemas/Pagination' } } } } } } } },
+        },
+      },
+    },
+    '/integrations/errors/get': {
+      post: {
+        tags: ['Error Integrations'],
+        summary: 'Get runtime error group',
+        security: [{ BearerAuth: [] }, { ApiKeyAuth: [] }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['id'], properties: { id: { type: 'string', format: 'uuid' } } } } } },
+        responses: { 200: { description: 'Error group', content: { 'application/json': { schema: { type: 'object', properties: { data: { type: 'object', properties: { errorGroup: { $ref: '#/components/schemas/ErrorGroup' } } } } } } } } },
+      },
+    },
+    '/integrations/errors/ignore': {
+      post: {
+        tags: ['Error Integrations'],
+        summary: 'Ignore runtime error group',
+        description: 'Requires `triage_errors` project permission or API key scope `errors:triage`.',
+        security: [{ BearerAuth: [] }, { ApiKeyAuth: [] }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['id', 'ignoreReason'], properties: { id: { type: 'string', format: 'uuid' }, ignoredUntil: { type: 'string', format: 'date-time' }, ignoreReason: { type: 'string', minLength: 1, maxLength: 1000 } } } } } },
+        responses: { 200: { description: 'Error group ignored', content: { 'application/json': { schema: { type: 'object', properties: { data: { type: 'object', properties: { errorGroup: { $ref: '#/components/schemas/ErrorGroup' } } } } } } } } },
+      },
+    },
+    '/integrations/errors/unignore': {
+      post: {
+        tags: ['Error Integrations'],
+        summary: 'Unignore runtime error group',
+        description: 'Requires `triage_errors` project permission or API key scope `errors:triage`.',
+        security: [{ BearerAuth: [] }, { ApiKeyAuth: [] }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['id'], properties: { id: { type: 'string', format: 'uuid' } } } } } },
+        responses: { 200: { description: 'Error group restored', content: { 'application/json': { schema: { type: 'object', properties: { data: { type: 'object', properties: { errorGroup: { $ref: '#/components/schemas/ErrorGroup' } } } } } } } } },
+      },
+    },
+    '/integrations/errors/bridge/alertmanager': {
+      post: {
+        tags: ['Error Integrations'],
+        summary: 'Alertmanager bridge webhook',
+        description: 'Queues Alertmanager payloads. Guarded by `SCOUT_ERROR_BRIDGE_SECRET` via `X-Scout-Error-Bridge-Secret` or Bearer secret.',
+        security: [],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['alerts'], properties: { alerts: { type: 'array', minItems: 1, maxItems: 50, items: { type: 'object' } } } } } } },
+        responses: { 202: { description: 'Queued' }, 200: { description: 'Duplicate already queued' }, 503: { description: 'Bridge disabled' } },
+      },
+    },
+    '/integrations/errors/bridge/health': {
+      get: {
+        tags: ['Error Integrations'],
+        summary: 'Error bridge queue health',
+        security: [],
+        responses: { 200: { description: 'Bridge queue status' } },
       },
     },
 

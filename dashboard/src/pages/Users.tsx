@@ -122,11 +122,13 @@ export default function Users() {
         const body: Record<string, unknown> = {
           id: editingId,
           name: form.name,
-          role: form.role,
-          isActive: form.isActive,
           projectRoles: form.projectRoles,
         };
-        if (form.password) {
+        if (admin) {
+          body.role = form.role;
+          body.isActive = form.isActive;
+        }
+        if (admin && form.password) {
           body.password = form.password;
         }
         await api('/api/users/update', body);

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { api } from '../lib/api';
 import { formatDate, formatDateShort } from '../lib/date';
-import { isAdmin } from '../lib/auth';
+import { canCreateItems, isAdmin } from '../lib/auth';
 import {
   findSelectableProjectId,
   getStoredSelectedProjectId,
@@ -280,9 +280,8 @@ export default function Items() {
       const created = await api<Item>('/api/items/create', {
         projectId: selectedProject,
         itemType: createType,
-        source: 'dashboard',
         message: createMessage.trim(),
-        priority: createType === 'note' ? 'medium' : createPriority,
+        ...(createType !== 'note' ? { priority: createPriority } : {}),
       });
       setShowCreateModal(false);
       await fetchData(true);
@@ -326,6 +325,7 @@ export default function Items() {
 
   const totalAll =
     counts.new + counts.in_progress + counts.review + counts.testing + counts.done + counts.cancelled;
+  const canCreateSelectedItem = selectedProject ? canCreateItems(selectedProject) : false;
 
   function getTabCount(status: string): number | null {
     if (status === 'all') return totalAll || null;
@@ -344,7 +344,7 @@ export default function Items() {
           <button
             type="button"
             onClick={openCreateModal}
-            disabled={!selectedProject}
+            disabled={!selectedProject || !canCreateSelectedItem}
             className="w-full rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50 md:w-auto md:py-1.5"
           >
             {t('items.create')}

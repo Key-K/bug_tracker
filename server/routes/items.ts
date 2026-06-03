@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { eq, and, desc, count, like, or, inArray } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { scoutItems, scoutItemNotes, scoutItemEvidence, scoutItemLinks, projects, users, errorGroups, type ApiKey, type ScoutItemLink } from '../db/schema.js';
+import { scoutItems, scoutItemNotes, scoutItemEvidence, scoutItemLinks, projects, users, errorGroups, type ApiKey, type ItemSource, type ScoutItemLink } from '../db/schema.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { checkProjectAccess, hasProjectPermission, requireProjectPermission } from '../middleware/permissions.js';
 import { randomUUID } from 'node:crypto';
@@ -55,6 +55,13 @@ function getItemPermissions(item: typeof scoutItems.$inferSelect, user: typeof u
     canComment,
     canLinkItems: canWorkflow,
   };
+}
+
+function deriveItemSource(data: ReturnType<typeof createItemSchema.parse>, apiKey: ApiKey | null): ItemSource {
+  if (apiKey?.purpose === 'agent') return 'agent';
+  if (apiKey) return 'api';
+  if (data.pageUrl || data.cssSelector || data.screenshot || data.sessionRecording) return 'widget';
+  return 'dashboard';
 }
 
 function getRelatedItems(itemId: string) {
@@ -113,8 +120,9 @@ export const itemRoutes = new Hono()
 
       requireProjectPermission(user.id, user.role, data.projectId, 'create_item', c.get('apiKey'));
 
-      const item = createItem({ ...data, reporterId: user.id });
-      logAudit({ userId: user.id, action: 'create_item', entityType: 'item', entityId: item.id, details: { projectId: data.projectId, itemType: data.itemType, source: data.source, priority: data.priority }, ipAddress: getClientIp(c) });
+      const source = deriveItemSource(data, c.get('apiKey'));
+      const item = createItem({ ...data, reporterId: user.id, source });
+      logAudit({ userId: user.id, action: 'create_item', entityType: 'item', entityId: item.id, details: { projectId: data.projectId, itemType: item.itemType, source: item.source, priority: item.priority }, ipAddress: getClientIp(c) });
       dispatchWebhooks(data.projectId, 'item.created', { item }).catch(() => {});
       eventBus.publish({ type: 'item.created', projectId: data.projectId, payload: { item } });
       return c.json({ data: item }, 201);

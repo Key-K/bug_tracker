@@ -240,6 +240,12 @@ scout.example.com {
 | `SCOUT_PORT` | `10009` | Server port |
 | `SCOUT_DB_PATH` | `data/scout.db` | SQLite database path |
 | `SCOUT_CORS_ORIGINS` | — | Comma-separated allowed origins |
+| `SCOUT_DASHBOARD_WIDGET_PROJECT_SLUG` | — | Optional project slug for dashboard-embedded widget config |
+| `SCOUT_ERROR_BRIDGE_SECRET` | — | Shared secret required to enable the Alertmanager error bridge |
+| `SCOUT_ERROR_BRIDGE_WORKER_ENABLED` | `true` | Set `false` to disable background processing of queued error bridge jobs |
+| `SCOUT_ERROR_BRIDGE_WORKER_INTERVAL_MS` | `30000` | Error bridge worker interval |
+| `SCOUT_ERROR_BRIDGE_BATCH_SIZE` | `20` | Error bridge jobs processed per worker tick |
+| `SCOUT_ERROR_BRIDGE_MAX_ATTEMPTS` | `10` | Max delivery attempts before a bridge job is marked dead |
 | `SMTP_HOST` | — | SMTP server for email notifications |
 | `SMTP_PORT` | `587` | SMTP port |
 | `SMTP_USER` | — | SMTP username |
@@ -251,7 +257,7 @@ scout.example.com {
 
 Push to `dev` → typecheck + tests.
 
-Push to `master` → typecheck + tests → Docker build + publish to GHCR.
+Push to `master` → typecheck + tests → Docker build + publish to GHCR → Deploy workflow when production Environment variables/secrets are configured.
 
 The repository also includes a generic GitHub Actions deploy workflow. It is safe for forks because all production-specific hosts, paths, SSH keys, and health URLs come from GitHub Environment secrets/variables, not from tracked files. Operators may also deploy the published image manually using the examples in `deploy/`.
 

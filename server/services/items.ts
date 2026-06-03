@@ -158,12 +158,30 @@ function requireHandoffEvidence(
   throw new ValidationError('Done requires fresh passing target-acceptance evidence', 'DONE_EVIDENCE_REQUIRED');
 }
 
+function decodeBase64Strict(base64: string): Buffer {
+  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(base64)) {
+    throw new ValidationError('Attachment payload must be valid base64', 'INVALID_ATTACHMENT');
+  }
+  return Buffer.from(base64, 'base64');
+}
+
+function assertRecordingEvents(buffer: Buffer): void {
+  try {
+    const parsed = JSON.parse(buffer.toString('utf8')) as unknown;
+    if (!Array.isArray(parsed) || !parsed.some((event) => typeof event === 'object' && event !== null && (event as { type?: unknown }).type === 2)) {
+      throw new Error('invalid rrweb events');
+    }
+  } catch {
+    throw new ValidationError('Session recording must be a valid rrweb JSON event array', 'INVALID_SESSION_RECORDING');
+  }
+}
+
 function saveFile(base64: string, dir: string, ext: string): string {
   const fullDir = join(process.cwd(), 'storage', dir);
   mkdirSync(fullDir, { recursive: true });
   const filename = `${randomUUID()}.${ext}`;
   const filePath = join(fullDir, filename);
-  const buffer = Buffer.from(base64, 'base64');
+  const buffer = decodeBase64Strict(base64);
   writeFileSync(filePath, buffer);
   return `storage/${dir}/${filename}`;
 }
@@ -178,21 +196,20 @@ function saveRecording(base64: string, dir: string): string {
   mkdirSync(fullDir, { recursive: true });
   const filename = `${randomUUID()}.json`;
   const filePath = join(fullDir, filename);
-  const buffer = Buffer.from(base64, 'base64');
+  const buffer = decodeBase64Strict(base64);
+  let jsonBuffer = buffer;
 
   // Detect gzip magic bytes (0x1f 0x8b) — decompress if gzip
   if (buffer.length >= 2 && buffer[0] === 0x1f && buffer[1] === 0x8b) {
     try {
-      const decompressed = gunzipSync(buffer);
-      writeFileSync(filePath, decompressed);
+      jsonBuffer = gunzipSync(buffer);
     } catch {
-      // Fallback: save raw (might be corrupted but better than nothing)
-      writeFileSync(filePath, buffer);
+      throw new ValidationError('Compressed session recording is corrupted', 'INVALID_SESSION_RECORDING');
     }
-  } else {
-    // Raw JSON from uncompressed recordings
-    writeFileSync(filePath, buffer);
   }
+
+  assertRecordingEvents(jsonBuffer);
+  writeFileSync(filePath, jsonBuffer);
 
   return `storage/${dir}/${filename}`;
 }
@@ -241,16 +258,18 @@ export function createItem(data: {
   }
 
   const id = randomUUID();
+  const itemType = data.itemType ?? 'bug';
+  const priority = itemType === 'note' ? null : (data.priority ?? 'medium');
 
   try {
     return db.transaction((tx) => {
       tx.insert(scoutItems).values({
         id,
         projectId: data.projectId,
-        itemType: data.itemType ?? 'bug',
+        itemType,
         source: data.source ?? 'widget',
         message: data.message,
-        priority: data.priority ?? 'medium',
+        priority,
         labels: data.labels ? JSON.stringify(data.labels) : null,
         pageUrl: data.pageUrl ?? null,
         pageRoute: data.pageRoute ?? null,
@@ -377,10 +396,13 @@ export function updateItem(itemId: string, data: {
   if (!item) throw new NotFoundError('Item', 'ITEM_NOT_FOUND');
 
   const updates: Record<string, unknown> = { updatedAt: now() };
+  const nextItemType = data.itemType ?? item.itemType;
   if (data.itemType !== undefined) updates.itemType = data.itemType;
   if (data.message !== undefined) updates.message = data.message;
   if (data.assigneeId !== undefined) updates.assigneeId = data.assigneeId;
-  if (data.priority !== undefined) updates.priority = data.priority;
+  if (nextItemType === 'note') updates.priority = null;
+  else if (data.priority !== undefined) updates.priority = data.priority;
+  else if (data.itemType !== undefined && item.priority === null) updates.priority = 'medium';
   if (data.labels !== undefined) updates.labels = JSON.stringify(data.labels);
 
   return db.transaction((tx) => {

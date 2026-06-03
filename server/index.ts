@@ -16,12 +16,14 @@ import { startBridgeWorker } from './services/error-groups.js';
 import { eventRoutes } from './routes/events.js';
 import { docsRoutes } from './routes/docs.js';
 import { db, sqlite } from './db/client.js';
-import { projects } from './db/schema.js';
-import { eq } from 'drizzle-orm';
+import { projects, scoutItems } from './db/schema.js';
+import { eq, or } from 'drizzle-orm';
 import { securityHeaders } from './middleware/security-headers.js';
 import { rateLimit } from './middleware/rate-limit.js';
 import { authMiddleware, storageAuth } from './middleware/auth.js';
+import { checkProjectAccess } from './middleware/permissions.js';
 import { logger } from './lib/logger.js';
+import { normalizeOrigin } from './lib/origins.js';
 
 const app = new Hono();
 
@@ -82,7 +84,11 @@ const isProduction = process.env.NODE_ENV === 'production';
 const corsOrigins = (process.env.SCOUT_CORS_ORIGINS || '')
   .split(',')
   .map((s) => s.trim())
-  .filter(Boolean);
+  .filter(Boolean)
+  .map((origin) => {
+    try { return normalizeOrigin(origin); } catch { logger.warn({ origin }, 'Skipping invalid CORS origin'); return null; }
+  })
+  .filter((origin): origin is string => origin !== null);
 
 // Cache of all allowed origins: env var + project allowedOrigins from DB (refreshed every 60s)
 let cachedOrigins: Set<string> = new Set();
@@ -104,7 +110,9 @@ function getAllowedOrigins(): Set<string> {
     for (const p of allProjects) {
       try {
         const arr: string[] = JSON.parse(p.allowedOrigins);
-        for (const o of arr) origins.add(o);
+        for (const o of arr) {
+          try { origins.add(normalizeOrigin(o)); } catch { /* skip invalid origin */ }
+        }
       } catch { /* skip malformed JSON */ }
     }
   } catch (err) {
@@ -173,9 +181,24 @@ app.route('/api/v1', v1);
 // Backward compatibility: /api/* → same as /api/v1/*
 app.route('/api', v1);
 
-// Static files: screenshots, recordings — require authentication
-// Supports both Authorization header and ?token= query param (for <img src>, fetch without headers)
-app.use('/storage/*', storageAuth, serveStatic({ root: './' }));
+// Static files: screenshots, recordings — require authentication and project access.
+// Supports both Authorization header and ?token= query param (for <img src>, fetch without headers).
+app.use('/storage/*', storageAuth, async (c, next) => {
+  const storagePath = c.req.path.replace(/^\/+/, '');
+  const item = db.select({ projectId: scoutItems.projectId }).from(scoutItems)
+    .where(or(eq(scoutItems.screenshotPath, storagePath), eq(scoutItems.sessionRecordingPath, storagePath)))
+    .get();
+  if (!item) throw new HTTPException(404, { message: 'Storage file not found' });
+
+  const user = c.get('user');
+  const apiKey = c.get('apiKey');
+  if (apiKey) {
+    if (apiKey.projectId !== item.projectId) throw new HTTPException(403, { message: 'No access to this storage file' });
+  } else if (!checkProjectAccess(user.id, user.role, item.projectId)) {
+    throw new HTTPException(403, { message: 'No access to this storage file' });
+  }
+  await next();
+}, serveStatic({ root: './' }));
 
 // SSO bridge — lightweight HTML page for cross-domain token storage via postMessage
 app.get('/auth/sso', (c) => {
@@ -189,7 +212,8 @@ app.get('/auth/sso', (c) => {
 (function(){
   var TK='__scout_token__',UK='__scout_user__';
   var ALLOWED=${originsJson};
-  function allowed(o){if(!ALLOWED.length)return true;for(var i=0;i<ALLOWED.length;i++){if(ALLOWED[i]===o)return true}return false}
+  var ALLOW_ALL=${JSON.stringify(!isProduction)};
+  function allowed(o){if(ALLOW_ALL)return true;for(var i=0;i<ALLOWED.length;i++){if(ALLOWED[i]===o)return true}return false}
   function g(k){try{return localStorage.getItem(k)}catch(e){return null}}
   function s(k,v){try{localStorage.setItem(k,v)}catch(e){}}
   function r(k){try{localStorage.removeItem(k)}catch(e){}}

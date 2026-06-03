@@ -11,6 +11,7 @@ import { alertmanagerWebhookSchema, errorUpsertSchema, getErrorGroupSchema, igno
 import { enqueueBridgeJob, getBridgeStatus, ignoreErrorGroup, listErrorGroups, processBridgeJobs, resolveErrorProjectId, unignoreErrorGroup, upsertErrorGroup } from '../services/error-groups.js';
 import { eventBus } from '../lib/event-bus.js';
 import { HTTPException } from 'hono/http-exception';
+import { dispatchWebhooks } from '../services/webhooks.js';
 
 const BRIDGE_SECRET_HEADER = 'x-scout-error-bridge-secret';
 
@@ -36,7 +37,9 @@ export const integrationsErrorsRoutes = new Hono()
     const projectId = resolveErrorProjectId(input);
     requireProjectPermission(user.id, user.role, projectId, 'write_errors', apiKey);
     const group = upsertErrorGroup(input, projectId);
-    eventBus.publish({ type: group.occurrenceCount === 1 ? 'error_group.created' : 'error_group.updated', projectId: group.projectId, payload: { errorGroup: group } });
+    const eventType = group.occurrenceCount === 1 ? 'error_group.created' : 'error_group.updated';
+    dispatchWebhooks(group.projectId, eventType, { errorGroup: group }).catch(() => {});
+    eventBus.publish({ type: eventType, projectId: group.projectId, payload: { errorGroup: group } });
     return c.json({ data: { errorGroup: group } }, group.occurrenceCount === 1 ? 201 : 200);
   })
   .post('/list', authMiddleware, zValidator('json', listErrorGroupsSchema), async (c) => {
@@ -60,6 +63,7 @@ export const integrationsErrorsRoutes = new Hono()
     const user = c.get('user');
     requireProjectPermission(user.id, user.role, existing.projectId, 'triage_errors', c.get('apiKey'));
     const group = ignoreErrorGroup(input.id, input.ignoreReason, input.ignoredUntil);
+    dispatchWebhooks(group.projectId, 'error_group.updated', { errorGroup: group }).catch(() => {});
     eventBus.publish({ type: 'error_group.updated', projectId: group.projectId, payload: { errorGroup: group } });
     return c.json({ data: { errorGroup: group } });
   })
@@ -70,6 +74,7 @@ export const integrationsErrorsRoutes = new Hono()
     const user = c.get('user');
     requireProjectPermission(user.id, user.role, existing.projectId, 'triage_errors', c.get('apiKey'));
     const group = unignoreErrorGroup(input.id);
+    dispatchWebhooks(group.projectId, 'error_group.updated', { errorGroup: group }).catch(() => {});
     eventBus.publish({ type: 'error_group.updated', projectId: group.projectId, payload: { errorGroup: group } });
     return c.json({ data: { errorGroup: group } });
   })

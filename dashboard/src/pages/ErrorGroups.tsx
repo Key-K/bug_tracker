@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { api } from '../lib/api';
 import { formatDate } from '../lib/date';
+import { canTriageErrors } from '../lib/auth';
 import {
   findSelectableProjectId,
   getStoredSelectedProjectId,
@@ -92,6 +93,7 @@ export default function ErrorGroups() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [actionId, setActionId] = useState<string | null>(null);
+  const canTriageSelectedErrors = selectedProject ? canTriageErrors(selectedProject) : false;
 
   useEffect(() => {
     api<{ items: Project[] }>('/api/projects/list', { perPage: 100 }).then((res) => {
@@ -264,17 +266,19 @@ export default function ErrorGroups() {
                       {group.grafanaTraceUrl && <a href={group.grafanaTraceUrl} target="_blank" rel="noreferrer" className="text-xs font-medium text-blue-600 hover:underline">{t('errors.links.trace')}</a>}
                     </div>
                   </div>
-                  <div className="flex gap-2 md:flex-col">
-                    {group.state === 'ignored' ? (
-                      <button onClick={() => handleUnignore(group)} disabled={actionId === group.id} className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
-                        {t('errors.actions.unignore')}
-                      </button>
-                    ) : (
-                      <button onClick={() => handleIgnore(group)} disabled={actionId === group.id} className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
-                        {t('errors.actions.ignore')}
-                      </button>
-                    )}
-                  </div>
+                  {canTriageSelectedErrors && (
+                    <div className="flex gap-2 md:flex-col">
+                      {group.state === 'ignored' ? (
+                        <button onClick={() => handleUnignore(group)} disabled={actionId === group.id} className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+                          {t('errors.actions.unignore')}
+                        </button>
+                      ) : (
+                        <button onClick={() => handleIgnore(group)} disabled={actionId === group.id} className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+                          {t('errors.actions.ignore')}
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

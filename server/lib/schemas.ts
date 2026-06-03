@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { WEBHOOK_EVENT_TYPES } from '../db/schema.js';
+import { normalizeOrigin } from './origins.js';
 
 // === Shared ===
 const paginationSchema = z.object({
@@ -7,6 +9,21 @@ const paginationSchema = z.object({
 });
 
 const uuidSchema = z.string().uuid();
+
+const allowedOriginSchema = z.string().url().max(500).transform((value, ctx) => {
+  try {
+    return normalizeOrigin(value);
+  } catch {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Allowed origin must use http or https' });
+    return z.NEVER;
+  }
+});
+
+const base64Schema = (maxLength: number) => z.string()
+  .max(maxLength)
+  .refine((value) => /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value), {
+    message: 'Must be valid base64',
+  });
 
 const itemEvidenceSchema = z.object({
   kind: z.enum(['handoff', 'verification', 'audit', 'blocker']).default('handoff'),
@@ -57,13 +74,13 @@ export const createProjectSchema = z.object({
     .regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with hyphens')
     .min(2)
     .max(50),
-  allowedOrigins: z.array(z.string().url()).default([]),
+  allowedOrigins: z.array(allowedOriginSchema).default([]),
 });
 
 export const updateProjectSchema = z.object({
   id: uuidSchema,
   name: z.string().min(1).max(100).optional(),
-  allowedOrigins: z.array(z.string().url()).optional(),
+  allowedOrigins: z.array(allowedOriginSchema).optional(),
   isActive: z.boolean().optional(),
 });
 
@@ -109,12 +126,10 @@ export const listUsersSchema = paginationSchema.extend({
 
 // === Items ===
 const itemTypeSchema = z.enum(['bug', 'note', 'task']);
-const itemSourceSchema = z.enum(['widget', 'dashboard', 'api', 'agent']);
 
 export const createItemSchema = z.object({
   projectId: uuidSchema,
   itemType: itemTypeSchema.default('bug'),
-  source: itemSourceSchema.default('widget'),
   message: z.string().min(3),
   priority: z.enum(['critical', 'high', 'medium', 'low']).default('medium'),
   labels: z.array(z.string().max(50)).max(10).optional(),
@@ -126,8 +141,8 @@ export const createItemSchema = z.object({
   elementHtml: z.string().transform((v) => v?.substring(0, 2000)).nullish(),
   viewportWidth: z.number().int().min(1).nullish(),
   viewportHeight: z.number().int().min(1).nullish(),
-  screenshot: z.string().max(7_000_000).nullish(),       // base64, ~5MB file
-  sessionRecording: z.string().max(3_000_000).nullish(),  // base64, ~2MB file
+  screenshot: base64Schema(7_000_000).nullish(),       // base64, ~5MB file
+  sessionRecording: base64Schema(3_000_000).nullish(),  // base64, ~2MB file
   metadata: z.record(z.string()).nullish(),               // auto-captured environment data
 });
 
@@ -245,13 +260,7 @@ export const validateTokenSchema = z.object({
 });
 
 // === Webhooks ===
-const webhookEventEnum = z.enum([
-  'item.created',
-  'item.status_changed',
-  'item.assigned',
-  'item.commented',
-  'item.deleted',
-]);
+const webhookEventEnum = z.enum(WEBHOOK_EVENT_TYPES);
 
 export const createWebhookSchema = z.object({
   projectId: uuidSchema,
@@ -263,7 +272,7 @@ export const createWebhookSchema = z.object({
 export const updateWebhookSchema = z.object({
   id: uuidSchema,
   url: z.string().url().max(500).optional(),
-  secret: z.string().max(255).optional(),
+  secret: z.string().max(255).nullable().optional(),
   events: z.array(webhookEventEnum).min(1).optional(),
   isActive: z.boolean().optional(),
 });

@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
 import { api } from '../lib/api';
+import { canManageIntegrations, canManageProjectSettings, isAdmin } from '../lib/auth';
 import { useTranslation } from '../i18n';
 import Pagination from '../components/Pagination';
 import Toggle from '../components/Toggle';
@@ -42,6 +43,7 @@ const emptyForm = {
 
 export default function Projects() {
   const { t } = useTranslation();
+  const admin = isAdmin();
   const [projects, setProjects] = useState<Project[]>([]);
   const [pagination, setPagination] = useState<PaginationData>({
     page: 1,
@@ -159,12 +161,14 @@ export default function Projects() {
           <h1 className="text-xl font-bold text-gray-900">{t('projects.title')}</h1>
           <p className="mt-1 text-sm text-gray-500">{t('projects.description')}</p>
         </div>
-        <button
-          onClick={openCreate}
-          className="rounded-md bg-gray-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-gray-800"
-        >
-          {t('projects.create')}
-        </button>
+        {admin && (
+          <button
+            onClick={openCreate}
+            className="rounded-md bg-gray-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-gray-800"
+          >
+            {t('projects.create')}
+          </button>
+        )}
       </div>
 
       {/* Desktop table */}
@@ -194,7 +198,10 @@ export default function Projects() {
                 </td>
               </tr>
             ) : (
-              projects.map((p) => (
+              projects.map((p) => {
+                const canEditProject = canManageProjectSettings(p.id);
+                const canUseIntegrations = canManageIntegrations(p.id);
+                return (
                 <tr key={p.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-800">
                     {p.name}
@@ -206,32 +213,40 @@ export default function Projects() {
                     {p.allowedOrigins.join(', ') || '—'}
                   </td>
                   <td className="px-4 py-3 align-top">
-                    <Link to={`/projects/${p.id}/integrations`} className="text-sm font-medium text-blue-600 hover:underline">
-                      {t('projects.integrations.manage')}
-                    </Link>
+                    {canUseIntegrations ? (
+                      <Link to={`/projects/${p.id}/integrations`} className="text-sm font-medium text-blue-600 hover:underline">
+                        {t('projects.integrations.manage')}
+                      </Link>
+                    ) : '—'}
                   </td>
                   <td className="px-4 py-3 text-center">
                     <Toggle
                       checked={p.isActive}
                       onChange={() => toggleField(p, 'isActive')}
+                      disabled={!canEditProject}
                     />
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => openEdit(p)}
-                      className="text-sm text-blue-600 hover:underline"
-                    >
-                      {t('common.edit')}
-                    </button>
-                    <button
-                      onClick={() => handleDelete(p.id)}
-                      className="ml-3 text-sm text-red-600 hover:underline"
-                    >
-                      {t('common.delete')}
-                    </button>
+                    {canEditProject && (
+                      <button
+                        onClick={() => openEdit(p)}
+                        className="text-sm text-blue-600 hover:underline"
+                      >
+                        {t('common.edit')}
+                      </button>
+                    )}
+                    {admin && (
+                      <button
+                        onClick={() => handleDelete(p.id)}
+                        className="ml-3 text-sm text-red-600 hover:underline"
+                      >
+                        {t('common.delete')}
+                      </button>
+                    )}
                   </td>
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>
@@ -244,7 +259,10 @@ export default function Projects() {
         ) : projects.length === 0 ? (
           <div className="py-8 text-center text-gray-400">{t('common.noData')}</div>
         ) : (
-          projects.map((p) => (
+          projects.map((p) => {
+            const canEditProject = canManageProjectSettings(p.id);
+            const canUseIntegrations = canManageIntegrations(p.id);
+            return (
             <div
               key={p.id}
               className="rounded-lg border border-gray-200 bg-white p-3"
@@ -267,39 +285,47 @@ export default function Projects() {
                   {p.allowedOrigins.join(', ')}
                 </div>
               )}
-              <Link
-                to={`/projects/${p.id}/integrations`}
-                className="mt-2 inline-flex rounded-md border border-blue-200 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50"
-              >
-                {t('projects.integrations.manage')}
-              </Link>
+              {canUseIntegrations && (
+                <Link
+                  to={`/projects/${p.id}/integrations`}
+                  className="mt-2 inline-flex rounded-md border border-blue-200 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50"
+                >
+                  {t('projects.integrations.manage')}
+                </Link>
+              )}
               <div className="mt-2.5 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <label className="flex items-center gap-1.5 text-xs text-gray-500">
-                    <Toggle
-                      checked={p.isActive}
-                      onChange={() => toggleField(p, 'isActive')}
-                    />
+                      <Toggle
+                        checked={p.isActive}
+                        onChange={() => toggleField(p, 'isActive')}
+                        disabled={!canEditProject}
+                      />
                     {t('projects.form.active')}
                   </label>
                 </div>
                 <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => openEdit(p)}
-                    className="text-xs text-blue-600 hover:underline"
-                  >
-                    {t('common.edit')}
-                  </button>
-                  <button
-                    onClick={() => handleDelete(p.id)}
-                    className="text-xs text-red-600 hover:underline"
-                  >
-                    {t('common.delete')}
-                  </button>
+                  {canEditProject && (
+                    <button
+                      onClick={() => openEdit(p)}
+                      className="text-xs text-blue-600 hover:underline"
+                    >
+                      {t('common.edit')}
+                    </button>
+                  )}
+                  {admin && (
+                    <button
+                      onClick={() => handleDelete(p.id)}
+                      className="text-xs text-red-600 hover:underline"
+                    >
+                      {t('common.delete')}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
-          ))
+            );
+          })
         )}
       </div>
 

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router';
-import { getUser, hasOwnedProjects, isAdmin, logout } from '../lib/auth';
+import { canManageIntegrations, canManageMembers, canSeeProjectAdmin, getUser, logout } from '../lib/auth';
 import { api } from '../lib/api';
 import { useSSE, type SSEEventType } from '../hooks/useSSE';
 import { useTranslation, LOCALE_LABELS, type Locale } from '../i18n';
@@ -9,8 +9,9 @@ const SCOUT_REPOSITORY_URL = 'https://github.com/scout-dev-org/scout';
 
 export default function Layout() {
   const user = getUser();
-  const admin = isAdmin();
-  const canManageProjects = hasOwnedProjects();
+  const canOpenProjectAdmin = canSeeProjectAdmin();
+  const showWebhooks = canManageIntegrations();
+  const showUsers = canManageMembers();
   const [newCount, setNewCount] = useState(0);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const location = useLocation();
@@ -129,7 +130,7 @@ export default function Layout() {
             </svg>
             {t('nav.errors')}
           </NavLink>
-          {canManageProjects && (
+          {canOpenProjectAdmin && (
             <>
               <NavLink to="/projects" className={linkClass}>
                 <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -137,22 +138,26 @@ export default function Layout() {
                 </svg>
                 {t('nav.projects')}
               </NavLink>
-              <NavLink to="/webhooks" className={linkClass}>
-                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-                </svg>
-                {t('nav.webhooks')}
-              </NavLink>
-              <NavLink to="/users" className={linkClass}>
-                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                  <circle cx="9" cy="7" r="4" />
-                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                </svg>
-                {t('nav.users')}
-              </NavLink>
+              {showWebhooks && (
+                <NavLink to="/webhooks" className={linkClass}>
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                  </svg>
+                  {t('nav.webhooks')}
+                </NavLink>
+              )}
+              {showUsers && (
+                <NavLink to="/users" className={linkClass}>
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                  </svg>
+                  {t('nav.users')}
+                </NavLink>
+              )}
             </>
           )}
         </nav>
@@ -278,7 +283,7 @@ export default function Layout() {
           </svg>
           {t('nav.errors')}
         </NavLink>
-          {canManageProjects && (
+          {canOpenProjectAdmin && (
           <>
             <NavLink to="/projects" className={bottomNavLinkClass}>
               <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -286,22 +291,26 @@ export default function Layout() {
               </svg>
               {t('nav.projects')}
             </NavLink>
-            <NavLink to="/webhooks" className={bottomNavLinkClass}>
-              <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-              </svg>
-              {t('nav.webhooks')}
-            </NavLink>
-            <NavLink to="/users" className={bottomNavLinkClass}>
-              <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-              </svg>
-              {t('nav.users')}
-            </NavLink>
+            {showWebhooks && (
+              <NavLink to="/webhooks" className={bottomNavLinkClass}>
+                <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                </svg>
+                {t('nav.webhooks')}
+              </NavLink>
+            )}
+            {showUsers && (
+              <NavLink to="/users" className={bottomNavLinkClass}>
+                <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+                {t('nav.users')}
+              </NavLink>
+            )}
           </>
         )}
         <button

@@ -32,6 +32,8 @@ const ALL_EVENT_KEYS = [
   { value: 'item.assigned', key: 'webhooks.events.item.assigned' },
   { value: 'item.commented', key: 'webhooks.events.item.commented' },
   { value: 'item.deleted', key: 'webhooks.events.item.deleted' },
+  { value: 'error_group.created', key: 'webhooks.events.error_group.created' },
+  { value: 'error_group.updated', key: 'webhooks.events.error_group.updated' },
 ] as const;
 
 const emptyForm = {
@@ -126,14 +128,14 @@ export default function Webhooks() {
         await api('/api/webhooks/update', {
           id: editingId,
           url: form.url,
-          secret: form.secret || undefined,
+          secret: form.secret.trim() || null,
           events: form.events,
         });
       } else {
         await api('/api/webhooks/create', {
           projectId: selectedProjectId,
           url: form.url,
-          secret: form.secret || undefined,
+          secret: form.secret.trim() || undefined,
           events: form.events,
         });
       }
