@@ -323,6 +323,7 @@ Rules:
 7. Before moving more than three items in one run, build a per-item readiness matrix: item id, original acceptance, evidence level, coverage, result, unchecked risks, and next honest status.
 8. If acceptance cannot be safely checked, create `blocker` evidence or a blocker note and keep/reopen the item according to reality. Do not convert blocked work to pass.
 9. When using the API, either call `/api/items/add-evidence` before the status change or include the `evidence` object in `/api/items/update-status` or `/api/items/resolve`.
+10. Use only Scout schema evidence kinds: `handoff` for handoff/review evidence, `verification` for `/api/items/resolve`, `audit` for audits, and `blocker` for blocked evidence. Do not invent `kind` values such as `acceptance`.
 
 ## Compact Regression Matrix
 
@@ -428,6 +429,7 @@ When `/scout` handles many items, keep local work atomic but do not stop at loca
 7. Different cases may need different checks. Choose item-specific staging verification from the item's evidence and changed surface instead of forcing one universal checklist.
 8. Do not claim every queued item at batch start. Claim an item only when implementation or active verification for that item or shared-root cluster starts.
 9. Before a batch status update, prepare a readiness matrix and update only rows whose individual evidence satisfies the status gate.
+10. Do not add optional deploy dry-runs to a known clean staging path unless repo docs require them or the target/branch/image is ambiguous.
 
 ## Deploy Path Discovery
 
@@ -445,16 +447,17 @@ Before any push, deploy, or target-environment verification, discover the one ca
 When completed work has a commit and the repository provides a canonical non-production staging path, `/scout` should push, deploy to staging, and verify there without waiting for a separate user prompt. Production deploys still require explicit user intent and repo-policy approval.
 
 1. Deploy only through the repository's canonical staging deploy path and wait for deploy health checks to pass. If the canonical path fails, stop and report the failed run, command, or check; do not invent a manual fallback unless the user explicitly approves it for that incident.
-2. Discover the `review` and `testing` items linked to the deployed branch/commit/PR. If the user says "all review tasks", inspect all `review` and `testing` items for the relevant Scout project.
-3. For each verification item, fetch the full item, notes, evidence, commit/branch/PR fields, related items, and acceptance hints before testing.
-4. Verify on staging, not local: use the deployed staging URL, staging API, browser checks for user-visible work, and targeted API/runtime checks for backend work. For user-visible work, the staging browser check must cover the acceptance path from User Journey Verification; API/curl evidence is support only.
-5. Keep checks item-specific. Do not replace targeted staging verification with a noisy full sweep unless the item itself requires broad coverage.
-6. If staging verification passes, add structured staging evidence and a Russian staging note with environment, URL, commit/deploy SHA, exact checks, and result; then move the item to `done`.
-7. If target verification starts but will continue beyond the current atomic check, move `review` -> `testing` and record what is being tested, by whom, and what evidence is still needed.
-8. If staging verification fails, add a Russian failure note with repro steps, expected/actual behavior, console/network/API evidence, and suspected cause; move the item back to `in_progress` and fix it end-to-end.
-9. After fixing a staging failure, repeat the normal lifecycle: local verification, commit referencing the same Scout item, Scout note, push, staging deploy, staging verification, then `done` only after staging passes.
-10. If verification is blocked by access, missing data, unsafe destructive action, or ambiguous expected behavior, leave the item in `review`, `testing`, or `in_progress` according to reality and record the exact blocker in Scout.
-11. Do not mark unrelated review/testing items as `done` just because the deploy succeeded.
+2. For long image build/push/cache-export phases, wait for the deploy process exit notification or its explicit timeout. Do not interrupt solely because output stalls; if the agent cancels the process, record it as operator cancellation, not as an external deploy blocker, and retry or verify before changing Scout status.
+3. Discover the `review` and `testing` items linked to the deployed branch/commit/PR. If the user says "all review tasks", inspect all `review` and `testing` items for the relevant Scout project.
+4. For each verification item, fetch the full item, notes, evidence, commit/branch/PR fields, related items, and acceptance hints before testing.
+5. Verify on staging, not local: use the deployed staging URL, staging API, browser checks for user-visible work, and targeted API/runtime checks for backend work. For user-visible work, the staging browser check must cover the acceptance path from User Journey Verification; API/curl evidence is support only.
+6. Keep checks item-specific. Do not replace targeted staging verification with a noisy full sweep unless the item itself requires broad coverage.
+7. If staging verification passes, add structured staging evidence and a Russian staging note with environment, URL, commit/deploy SHA, exact checks, and result; then move the item to `done`.
+8. If target verification starts but will continue beyond the current atomic check, move `review` -> `testing` and record what is being tested, by whom, and what evidence is still needed.
+9. If staging verification fails, add a Russian failure note with repro steps, expected/actual behavior, console/network/API evidence, and suspected cause; move the item back to `in_progress` and fix it end-to-end.
+10. After fixing a staging failure, repeat the normal lifecycle: local verification, commit referencing the same Scout item, Scout note, push, staging deploy, staging verification, then `done` only after staging passes.
+11. If verification is blocked by access, missing data, unsafe destructive action, or ambiguous expected behavior, leave the item in `review`, `testing`, or `in_progress` according to reality and record the exact blocker in Scout.
+12. Do not mark unrelated review/testing items as `done` just because the deploy succeeded.
 
 ## Communication In Scout
 

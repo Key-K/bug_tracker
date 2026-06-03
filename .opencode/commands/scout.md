@@ -18,6 +18,7 @@ Status rules:
 - `in_progress` -> `review` only after implementation, checks, browser/runtime verification when relevant, focused commit/PR reference, Russian handoff note, and structured evidence with `result`, `level`, `coverage`, `acceptanceScope`, and commit/PR reference; prefer continuing through push, staging deploy, and staging verification before stopping at `review` when that path is available and safe.
 - `review`/`testing` -> `done` only after target-environment, staging, production, or explicit user acceptance with fresh per-item evidence; use schema-complete `resolve` evidence, and keep shared-root-only coverage below `done` until the related item's acceptance path is covered.
 - After local completion, prefer `commit -> push -> staging deploy -> staging verification` before final handoff; if any step is unavailable, unsafe, or fails, record the exact blocker/failure and use the furthest honest status.
+- For `/api/items/resolve`, use evidence `kind:"verification"`; do not invent unsupported evidence kinds such as `acceptance`.
 - Weak, failing, stale, generic, route-sweep-only, or cluster-only evidence keeps or returns the item to `in_progress` with a clear Russian blocker/failure note.
 - `testing` is only for active target-environment verification, never parking.
 - `cancelled` is only for duplicate/out-of-scope/invalid/obsolete items with a reason note.
@@ -26,6 +27,7 @@ Boundaries:
 - Do not claim the whole queue at once.
 - Do not push if repo policy forbids it, the branch target is unsafe, credentials are missing, or the target is a protected production branch.
 - Do not deploy if repo policy forbids it, credentials are missing, the target is production, or the canonical staging path is absent or failing.
+- Do not add optional deploy dry-runs to known clean staging paths, and do not cancel long build/push/cache-export deploy phases before exit or explicit timeout just because output stalls.
 - Do not push protected production branches or deploy production unless repo workflow and the user's request explicitly allow it.
 - Do not mark `done` just because code changed, checks passed, or deploy succeeded.
 - Keep secrets out of Scout notes, evidence, commits, docs, and routine chat; exact private values may be shown only when the user explicitly asks for them in the current chat.
