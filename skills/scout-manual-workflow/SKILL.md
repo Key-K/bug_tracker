@@ -316,7 +316,7 @@ Rules:
 
 1. Do not move user-visible work to `review` or `done` with only `200 OK`, route-smoke, old notes, or code reasoning.
 2. For mutation workflows, evidence must include the action and post-condition: UI state, list/detail/read path, network/API response, and DB/read-model/audit trail where relevant.
-3. For `review`, evidence must be `result:"pass"` and include a real `commitSha` or real `mrUrl`; otherwise keep the item in `in_progress` with a blocker/progress note.
+3. For `review`, evidence must be `result:"pass"` and include a real `commitSha` or real `mrUrl`; never enter placeholder refs in Scout evidence or status fields. Otherwise keep the item in `in_progress` with a blocker/progress note.
 4. For `done`, evidence must be `result:"pass"` with target acceptance: `local_acceptance` only when the item/project/user explicitly accepts local as the target, otherwise `staging_acceptance`, `production_acceptance`, or `user_acceptance`.
 5. Generic route sweeps, cluster checks, and API smoke can support a transition, but cannot replace item-specific acceptance unless `coverage:"shared_root_cluster"` names exactly how this item is covered.
 6. For shared-root evidence, do not close a related item as `done` unless that item's original acceptance path or a documented equivalent was replayed. A root-cause/API check without the related user journey is at most `review` with explicit `uncheckedRisks`.
