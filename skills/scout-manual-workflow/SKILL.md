@@ -585,6 +585,7 @@ Do not present the item as complete until all of these are true:
 6. Push, staging deploy, and staging acceptance were completed when a safe canonical staging path existed; otherwise the exact blocker is recorded in Scout.
 7. Scout has structured evidence plus Russian notes covering start, root cause when relevant, completion or blocker, verification, commit/branch/PR/deploy references, status change, and remaining risks.
 8. The Scout status reflects reality: `in_progress` while working or blocked on clarification, `review` only when committed and waiting on a blocked or deferred staging/target verification, `testing` only while target verification is underway, `done` only after acceptance or documented staging pass, and no silent "left for later" work.
+9. Do not send the final user response while an authorized deploy, verification PTY, Scout status update, or queued follow-up step is still running and the next step is available. Continue until it exits and complete the remaining Scout handoff, or record a concrete blocker only when progress is technically blocked or unsafe.
 
 Final user response must be short and evidence-based:
 
@@ -600,7 +601,7 @@ Final user response must be short and evidence-based:
 
 All API calls are `POST` JSON unless retrieving storage assets. Authenticate with `Authorization: Bearer $SCOUT_API_KEY`.
 
-Current list endpoints return arrays under `data.items`. When operating against an older or unknown Scout server, inspect the first response once and normalize arrays with `(.data.items // .items // [])` instead of hardcoding an unverified response shape.
+Current list endpoints return arrays under `data.items`, including `/api/projects/list` and `/api/items/list`. When operating against an older or unknown Scout server, inspect the first response once and normalize arrays with `(.data.items // .items // [])` instead of hardcoding an unverified response shape.
 
 List projects:
 
@@ -611,7 +612,19 @@ set +a
 curl -fsS "$SCOUT_URL/api/projects/list" \
   -H "Authorization: Bearer $SCOUT_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"page":1,"perPage":100}'
+  -d '{"page":1,"perPage":100}' \
+  | jq 'if type=="string" then fromjson else . end | {items:(.data.items // .items // []), pagination:(.data.pagination // .pagination // null)}'
+```
+
+Resolve the current project id by slug without assuming a legacy response shape:
+
+```bash
+PROJECT_ID=$(curl -fsS "$SCOUT_URL/api/projects/list" \
+  -H "Authorization: Bearer $SCOUT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"page":1,"perPage":100}' \
+  | jq -r --arg slug "$SCOUT_PROJECT_SLUG" 'if type=="string" then fromjson else . end | (.data.items // .items // [])[] | select(.slug == $slug) | .id')
+test -n "$PROJECT_ID"
 ```
 
 List items for a project:
