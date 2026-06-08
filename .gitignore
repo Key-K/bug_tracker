@@ -19,6 +19,7 @@ CLAUDE.md
 docs/superpowers/
 
 # Test artifacts
+e2e/.token-cache.json
 test-results/
 *.png
 

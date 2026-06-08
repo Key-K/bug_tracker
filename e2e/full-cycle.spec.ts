@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { execFileSync } from 'node:child_process';
 import { writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,13 +19,27 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const API = 'http://localhost:10009';
 const DEMO = `${API}/demo/`;
 const DASHBOARD = `${API}`;
+const E2E_COMMIT_SHA = execFileSync('git', ['rev-parse', 'HEAD'], {
+  cwd: join(__dirname, '..'),
+  encoding: 'utf8',
+}).trim();
+const ONE_PIXEL_IMAGE_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
+let e2eRequestCounter = 0;
 
 // Shared token cache file — avoids rate-limited logins between browser projects
 const TOKEN_CACHE = join(__dirname, '.token-cache.json');
 
 // Helpers
+function nextE2eClientIp(): string {
+  e2eRequestCounter += 1;
+  return `10.42.${Math.floor(e2eRequestCounter / 200)}.${(e2eRequestCounter % 200) + 1}`;
+}
+
 async function apiPost(path: string, body: object, token?: string) {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'x-forwarded-for': nextE2eClientIp(),
+  };
   if (token) headers['Authorization'] = `Bearer ${token}`;
   const res = await fetch(`${API}/api${path}`, { method: 'POST', headers, body: JSON.stringify(body) });
   return { status: res.status, data: await res.json().catch(() => null) };
@@ -40,6 +55,21 @@ async function login(email: string, password: string): Promise<string> {
     return data?.data?.token as string;
   }
   throw new Error('Login failed after retries (rate limited)');
+}
+
+function passingEvidence(scenario: string, action: string, visibleResult: string, extra: Record<string, string> = {}) {
+  return {
+    result: 'pass',
+    level: 'local_acceptance',
+    coverage: 'item',
+    environment: 'e2e',
+    scenario,
+    action,
+    visibleResult,
+    acceptanceScope: scenario,
+    source: 'ci',
+    ...extra,
+  };
 }
 
 // --- Tests ---
@@ -148,7 +178,14 @@ test.describe('Full bug lifecycle', () => {
 
     // Update status (in_progress → review)
     const { status: reviewStatus } = await apiPost('/items/update-status', {
-      id: itemId, status: 'review',
+      id: itemId,
+      status: 'review',
+      evidence: passingEvidence(
+        'API lifecycle item is ready for review',
+        'Verified create, read, update, and claim API steps in the e2e lifecycle test',
+        'Item reached in_progress and is ready for review handoff',
+        { commitSha: E2E_COMMIT_SHA },
+      ),
     }, adminToken);
     expect(reviewStatus).toBe(200);
 
@@ -156,8 +193,11 @@ test.describe('Full bug lifecycle', () => {
     const { status: resolveStatus } = await apiPost('/items/resolve', {
       id: itemId,
       resolutionNote: 'Fixed in E2E test',
-      branchName: 'fix/e2e-test',
-      mrUrl: 'https://github.com/test/pr/1',
+      evidence: passingEvidence(
+        'API lifecycle item is complete',
+        'Verified review to done transition in the e2e lifecycle test',
+        'Item can be resolved with passing local acceptance evidence',
+      ),
     }, adminToken);
     expect(resolveStatus).toBe(200);
 
@@ -228,7 +268,9 @@ test.describe('Full bug lifecycle', () => {
   });
 
   test('6. API: OpenAPI spec is valid', async () => {
-    const res = await fetch(`${API}/api/docs/openapi.json`);
+    const res = await fetch(`${API}/api/docs/openapi.json`, {
+      headers: { 'x-forwarded-for': nextE2eClientIp() },
+    });
     expect(res.status).toBe(200);
     const spec = await res.json();
     expect(spec.openapi).toBe('3.0.3');
@@ -246,7 +288,7 @@ test.describe('Full bug lifecycle', () => {
   test('8. API: rate limiting headers present', async () => {
     const res = await fetch(`${API}/api/auth/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-forwarded-for': nextE2eClientIp() },
       body: JSON.stringify({ email: 'admin@scout.local', password: 'admin' }),
     });
     expect(res.headers.get('x-ratelimit-limit')).toBeTruthy();
@@ -265,7 +307,7 @@ test.describe('Full bug lifecycle', () => {
     // Use API key to call /items/count (less rate-limited path than /auth/*)
     const countRes = await fetch(`${API}/api/items/count`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${fullKey}` },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${fullKey}`, 'x-forwarded-for': nextE2eClientIp() },
       body: JSON.stringify({ projectId }),
     });
     expect(countRes.status).toBe(200);
@@ -277,7 +319,7 @@ test.describe('Full bug lifecycle', () => {
     // Revoked key should fail
     const countRes2 = await fetch(`${API}/api/items/count`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${fullKey}` },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${fullKey}`, 'x-forwarded-for': nextE2eClientIp() },
       body: JSON.stringify({ projectId }),
     });
     expect(countRes2.status).toBe(401);
@@ -333,16 +375,13 @@ test.describe('Full bug lifecycle', () => {
   test('14. Storage: query param token auth works', async () => {
     // Create an item with screenshot to test storage access
     const bugMsg = `Storage auth test ${Date.now()}`;
-    const { data: createData } = await apiPost('/items/create', {
+    const { status: createStatus, data: createData } = await apiPost('/items/create', {
       projectId,
       message: bugMsg,
       priority: 'low',
-      // Small 1x1 white JPEG as base64
-      screenshot: '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoMCwsKCwsM' +
-        'DRALDB4QEBMPEx0SEhMTFBQVFRYMEBcYGBQYFBQV/2wBDAQMEBAUEBQkFBQkVDgsOFRUVFRUVFRUVFRUVFRUV' +
-        'FRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRX/wAARCAABAAEDASIAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAACf/' +
-        'EABQQAQAAAAAAAAAAAAAAAAAAAAD/xAAUAQEAAAAAAAAAAAAAAAAAAAAA/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAwDAQACEQMRAD8AKwA//9k=',
+      screenshot: ONE_PIXEL_IMAGE_BASE64,
     }, adminToken);
+    expect(createStatus).toBe(201);
     expect(createData.data.screenshotPath).toBeTruthy();
 
     const screenshotPath = createData.data.screenshotPath;

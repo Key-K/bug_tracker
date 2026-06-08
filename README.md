@@ -139,15 +139,19 @@ User APIs use `projectRoles` for per-project access assignment.
 
 ## Agent Skill
 
-Scout also ships an installable agent skill for manual bug-tracker work. It is useful when a coding agent should take a Scout item, triage related items, inspect linked runtime error context when present, reproduce the bug, fix it in a local repository, verify the result, and update Scout notes/statuses with structured evidence without relying on background automation.
+Scout also ships an agent skill for manual bug-tracker work. It is useful when a coding agent should take a Scout item, triage related items, inspect linked runtime error context when present, reproduce the bug, fix it in a local repository, verify the result, and update Scout notes/statuses with structured evidence without relying on background automation.
 
-For OpenCode users, Scout ships a single slash command: `/scout`. The agent infers single-item, full active queue, review/testing verification, runtime-error follow-up, or done-audit mode from the argument and live queue state. The command runs the full Scout workflow through `scout-manual-workflow` and can be installed globally with:
+For OpenCode users, Scout ships a single slash command: `/scout`. The agent infers single-item, full active queue, review/testing verification, runtime-error follow-up, or done-audit mode from the argument and live queue state. The command runs the full Scout workflow through `scout-manual-workflow`.
+
+When running OpenCode from this repository, no skill installation is required: `.opencode/opencode.json` loads the repo `skills/` directory directly.
+
+For normal users who want `/scout` outside this repository, install the released command from a Scout checkout:
 
 ```bash
 ./scripts/install-opencode-commands.sh
 ```
 
-Install globally:
+Install the released skill globally:
 
 ```bash
 npx skills add scout-dev-org/scout --skill scout-manual-workflow --full-depth -g -y
@@ -161,7 +165,7 @@ npx skills update scout-manual-workflow -g -y
 
 Create an agent API key from the dashboard: `Projects` → target project → `Manage integrations` → `Create agent key`. The full `sk_live_*` key is shown once together with a ready-to-copy `SCOUT_*` env block. Store it in a password manager, shell environment, or local ignored `.env`, not in the repository.
 
-See `skills/README.md` for project-local install commands and required `SCOUT_*` environment variables.
+Scout developers who want live command or skill edits outside this checkout should use the linked setup in `skills/README.md` instead of reinstalling after each change. Restart OpenCode after changing commands, skills, or OpenCode config.
 
 ## API
 

@@ -1,6 +1,6 @@
 # Scout Skills
 
-This directory contains installable agent skills for working with Scout.
+This directory contains the canonical agent skills for working with Scout.
 
 ## `scout-manual-workflow`
 
@@ -14,7 +14,30 @@ The workflow is schema-aware: status transitions to `review` or `done` should us
 
 The command works without arguments and defaults to single-next mode. Text after `/scout` is natural-language scope input: it may identify an item, project, branch, deploy target, single-next work, full-queue work, review/testing verification, runtime-error follow-up, or done-audit behavior. Arguments are not a structured subcommand API.
 
-Install the commands globally for use in any repository:
+## Developer linked setup
+
+When running OpenCode from this repository, no skill installation is required. `.opencode/opencode.json` loads `skills/`, and `.opencode/commands/scout.md` provides `/scout` from the checkout.
+
+If you develop Scout and need `/scout` outside this repository, link your global OpenCode paths to this checkout once instead of reinstalling after every edit:
+
+```bash
+repo=/path/to/scout
+mkdir -p "$HOME/.config/opencode/commands" "$HOME/.config/opencode/skills"
+ln -sf "$repo/.opencode/commands/scout.md" "$HOME/.config/opencode/commands/scout.md"
+if [ -e "$HOME/.config/opencode/skills/scout-manual-workflow" ] || [ -L "$HOME/.config/opencode/skills/scout-manual-workflow" ]; then
+  mv "$HOME/.config/opencode/skills/scout-manual-workflow" "$HOME/.config/opencode/scout-manual-workflow.backup-$(date +%Y%m%d%H%M%S)"
+fi
+ln -s "$repo/skills/scout-manual-workflow" "$HOME/.config/opencode/skills/scout-manual-workflow"
+if [ -e "$HOME/.agents/skills/scout-manual-workflow" ] || [ -L "$HOME/.agents/skills/scout-manual-workflow" ]; then
+  mv "$HOME/.agents/skills/scout-manual-workflow" "$HOME/.agents/scout-manual-workflow.backup-$(date +%Y%m%d%H%M%S)"
+fi
+```
+
+Restart OpenCode after changing linked commands, skills, or OpenCode config. Do not run `npx skills update` as the local development sync mechanism.
+
+## Released install/update
+
+Normal users should install the released command globally from a Scout checkout:
 
 ```bash
 ./scripts/install-opencode-commands.sh
@@ -22,19 +45,19 @@ Install the commands globally for use in any repository:
 
 By default this copies commands to `~/.config/opencode/commands`. Override the target with `OPENCODE_COMMANDS_DIR=/path/to/commands` if needed. Restart OpenCode after installing or updating commands.
 
-Install globally from GitHub:
+Install the released skill globally from GitHub:
 
 ```bash
 npx skills add scout-dev-org/scout --skill scout-manual-workflow --full-depth -g -y
 ```
 
-Install into the current project instead:
+Install the released skill into the current project instead:
 
 ```bash
 npx skills add scout-dev-org/scout --skill scout-manual-workflow --full-depth -p -y
 ```
 
-Update later:
+Update a released global install later:
 
 ```bash
 npx skills update scout-manual-workflow -g -y
@@ -46,7 +69,7 @@ If installed project-locally, update from that project:
 npx skills update scout-manual-workflow -p -y
 ```
 
-List skills available in this repository without installing:
+List released skills available from GitHub without installing:
 
 ```bash
 npx skills add scout-dev-org/scout --list --full-depth
