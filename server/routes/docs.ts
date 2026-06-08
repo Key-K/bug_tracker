@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { ITEM_STATUSES } from '../db/schema.js';
 
 // ─── OpenAPI 3.0.3 Spec ──────────────────────────────────────────────────────
 
@@ -48,7 +49,7 @@ const spec = {
       // ── Enums ──
       ItemStatus: {
         type: 'string',
-        enum: ['new', 'in_progress', 'review', 'testing', 'done', 'cancelled'],
+        enum: [...ITEM_STATUSES],
       },
       ItemPriority: {
         type: 'string',
@@ -187,6 +188,8 @@ const spec = {
           canClaim: { type: 'boolean' },
           canUpdateStatus: { type: 'boolean' },
           canResolve: { type: 'boolean' },
+          canVerify: { type: 'boolean' },
+          canRequestChanges: { type: 'boolean' },
           canCancel: { type: 'boolean' },
           canReopen: { type: 'boolean' },
           canUpdate: { type: 'boolean' },
@@ -707,6 +710,8 @@ const spec = {
                             review: { type: 'integer' },
                             testing: { type: 'integer' },
                             done: { type: 'integer' },
+                            changes_requested: { type: 'integer' },
+                            verified: { type: 'integer' },
                             cancelled: { type: 'integer' },
                           },
                         },
@@ -754,7 +759,7 @@ const spec = {
       post: {
         tags: ['Items'],
         summary: 'Закрыть item (resolve)',
-        description: 'Переводит item в статус done. Для done/review требуется свежий structured evidence record или evidence в этом запросе. Agent automation should include result, level, coverage, environment, scenario, action, visibleResult, and item-specific acceptanceScope. Требуется project permission `workflow` (admin/owner/manager/developer).',
+        description: 'Переводит item в статус done: implementation/evidence complete, waiting for human acceptance. Для done/review требуется свежий structured evidence record или evidence в этом запросе. Agent automation should include result, level, coverage, environment, scenario, action, visibleResult, and item-specific acceptanceScope. Требуется project permission `workflow` (admin/owner/manager/developer).',
         security: [{ BearerAuth: [] }],
         requestBody: {
           required: true,
@@ -818,7 +823,7 @@ const spec = {
       post: {
         tags: ['Items'],
         summary: 'Обновить статус item',
-        description: 'Универсальный эндпоинт для смены статуса item. Переходы в review/done требуют свежий structured evidence record или evidence в этом запросе. Agent automation should include result, level, coverage, environment, scenario, action, visibleResult, and item-specific acceptanceScope. Требуется project permission `workflow` (admin/owner/manager/developer).',
+        description: 'Универсальный эндпоинт для инженерных workflow-переходов. Переходы в review/done требуют свежий structured evidence record или evidence в этом запросе. Human acceptance statuses `verified` and `changes_requested` must use `/items/verify` and `/items/request-changes`. Требуется project permission `workflow` (admin/owner/manager/developer).',
         security: [{ BearerAuth: [] }, { ApiKeyAuth: [] }],
         requestBody: {
           required: true,
@@ -849,11 +854,79 @@ const spec = {
         },
       },
     },
+    '/items/verify': {
+      post: {
+        tags: ['Items'],
+        summary: 'Принять item человеком',
+        description: 'Переводит item из done/testing в verified после human acceptance. Не перетирает resolvedById/resolvedAt, чтобы сохранить исполнителя done. Требуется project permission `triage` (admin/owner/manager).',
+        security: [{ BearerAuth: [] }, { ApiKeyAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['id'],
+                properties: {
+                  id: { type: 'string', format: 'uuid' },
+                  comment: { type: 'string', maxLength: 5000 },
+                  evidence: { $ref: '#/components/schemas/ItemEvidence' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Item verified',
+            content: { 'application/json': { schema: { type: 'object', properties: { data: { $ref: '#/components/schemas/Item' } } } } },
+          },
+          403: { description: 'Недостаточно прав', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+          404: { description: 'Item не найден', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+        },
+      },
+    },
+    '/items/request-changes': {
+      post: {
+        tags: ['Items'],
+        summary: 'Вернуть item на правки',
+        description: 'Переводит item из review/testing/done/verified в changes_requested и добавляет actionable note с expected/actual context. Требуется project permission `triage` (admin/owner/manager).',
+        security: [{ BearerAuth: [] }, { ApiKeyAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['id', 'summary', 'expected', 'actual'],
+                properties: {
+                  id: { type: 'string', format: 'uuid' },
+                  summary: { type: 'string', minLength: 3, maxLength: 2000 },
+                  expected: { type: 'string', minLength: 1, maxLength: 2000 },
+                  actual: { type: 'string', minLength: 1, maxLength: 2000 },
+                  steps: { type: 'string', maxLength: 5000 },
+                  url: { type: 'string', maxLength: 1000 },
+                  evidence: { $ref: '#/components/schemas/ItemEvidence' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Changes requested',
+            content: { 'application/json': { schema: { type: 'object', properties: { data: { $ref: '#/components/schemas/Item' } } } } },
+          },
+          403: { description: 'Недостаточно прав', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+          404: { description: 'Item не найден', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+        },
+      },
+    },
     '/items/reopen': {
       post: {
         tags: ['Items'],
         summary: 'Переоткрыть item',
-        description: 'Возвращает item из done/cancelled в статус new или сразу in_progress. Требуется project permission `triage` (admin/owner/manager).',
+        description: 'Возвращает item из done/verified/cancelled в статус new или сразу in_progress. Требуется project permission `triage` (admin/owner/manager).',
         security: [{ BearerAuth: [] }, { ApiKeyAuth: [] }],
         requestBody: {
           required: true,

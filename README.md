@@ -32,7 +32,9 @@ Tester saves note     →  Widget stores page-level observation without workflow
                                 ↓
                         AI triage converts useful notes → tasks
                                 ↓
-                        Review → testing → done
+                        new → in_progress → review → testing → done → verified
+                                 ↑                                │
+                                 └────── changes_requested ←──────┘
 ```
 
 ## Features
@@ -109,7 +111,7 @@ The dashboard shows a ready-to-copy snippet for each project under **Projects** 
 
 Responsive React SPA served from the same port as the API.
 
-- **Items** — Bug/note/task list with type/status/priority filters, search, pagination, manual creation, and note-to-task triage for humans or AI agents. Detail view with screenshot lightbox, rrweb session player, notes timeline, related items, linked runtime errors, resolve modal
+- **Items** — Bug/note/task list with type/status/priority filters, search, pagination, manual creation, and note-to-task triage for humans or AI agents. Detail view with screenshot lightbox, rrweb session player, notes timeline, related items, linked runtime errors, resolve modal, and simple human verify/request-changes actions
 - **Errors** — Runtime error groups with environment/service/fingerprint, route template, status/error classification, occurrence counts, linked Scout item, and Grafana/Tempo context links when provided by integrations
 - **Projects** — CRUD with allowed origins for CORS/SSO and links to per-project integrations
 - **Users** — CRUD with system roles and per-project role assignment
@@ -130,8 +132,8 @@ System `admin` can access everything. Non-admin users get access through `projec
 | Project role | Main permissions |
 |--------------|------------------|
 | `owner` | Full project management: project settings, members, integrations, item workflow/triage |
-| `manager` | Triage items: update, cancel, reopen, delete, assign, workflow |
-| `developer` | Claim, update workflow status, resolve, comment, link related items |
+| `manager` | Triage items: update, cancel, reopen, delete, assign, verify, request changes, workflow |
+| `developer` | Claim, update workflow status, resolve to `done`, comment, link related items |
 | `reporter` | Create items, comment, view, cancel own `new` items |
 | `viewer` | Read-only project access |
 
@@ -141,7 +143,7 @@ User APIs use `projectRoles` for per-project access assignment.
 
 Scout also ships an agent skill for manual bug-tracker work. It is useful when a coding agent should take a Scout item, triage related items, inspect linked runtime error context when present, reproduce the bug, fix it in a local repository, verify the result, and update Scout notes/statuses with structured evidence without relying on background automation.
 
-For OpenCode users, Scout ships a single slash command: `/scout`. The agent infers single-item, full active queue, review/testing verification, runtime-error follow-up, or done-audit mode from the argument and live queue state. The command runs the full Scout workflow through `scout-manual-workflow`.
+For OpenCode users, Scout ships a single slash command: `/scout`. The agent infers single-item, full active queue, review/testing verification, changes-requested follow-up, runtime-error follow-up, or done/verified audit mode from the argument and live queue state. The command runs the full Scout workflow through `scout-manual-workflow`.
 
 When running OpenCode from this repository, no skill installation is required: `.opencode/opencode.json` loads the repo `skills/` directory directly.
 
@@ -184,10 +186,12 @@ Interactive docs: `https://your-scout.example/api/docs`
 | `/api/items/list` | List items (filtered) |
 | `/api/items/get` | Get item with notes, related items, and current-user permissions |
 | `/api/items/claim` | Assign to self |
-| `/api/items/update-status` | Move an item through workflow states with structured evidence when required |
+| `/api/items/update-status` | Move an item through engineering workflow states with structured evidence when required |
 | `/api/items/add-evidence` | Add structured handoff, verification, audit, or blocker evidence |
-| `/api/items/resolve` | Mark as done |
-| `/api/items/reopen` | Reopen `done`/`cancelled` items to `new` or `in_progress`; optional `reason`/`auditResult` records why |
+| `/api/items/resolve` | Mark implementation as `done`, ready for human acceptance |
+| `/api/items/verify` | Human acceptance: move `done`/`testing` to `verified` |
+| `/api/items/request-changes` | Human rejection: move `review`/`testing`/`done`/`verified` to `changes_requested` with expected/actual context |
+| `/api/items/reopen` | Reopen `done`/`verified`/`cancelled` items to `new` or `in_progress`; optional `reason`/`auditResult` records why |
 | `/api/items/link` | Link related/duplicate/blocking items |
 | `/api/v1/integrations/errors/upsert` | Create/update runtime error groups and link them to Scout items |
 | `/api/v1/integrations/errors/list` | List runtime error groups for a project |

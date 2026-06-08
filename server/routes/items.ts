@@ -2,15 +2,15 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { eq, and, desc, count, like, or, inArray } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { scoutItems, scoutItemNotes, scoutItemEvidence, scoutItemLinks, projects, users, errorGroups, type ApiKey, type ItemSource, type ScoutItemLink } from '../db/schema.js';
+import { ITEM_STATUSES, scoutItems, scoutItemNotes, scoutItemEvidence, scoutItemLinks, projects, users, errorGroups, type ApiKey, type ItemSource, type ScoutItemLink } from '../db/schema.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { checkProjectAccess, hasProjectPermission, requireProjectPermission } from '../middleware/permissions.js';
 import { randomUUID } from 'node:crypto';
-import { NotFoundError, ForbiddenError } from '../lib/errors.js';
+import { NotFoundError, ForbiddenError, ValidationError } from '../lib/errors.js';
 import {
   createItemSchema, listItemsSchema, getItemSchema,
   countItemsSchema, claimItemSchema, resolveItemSchema,
-  cancelItemSchema, updateItemStatusSchema, addNoteSchema, addEvidenceSchema,
+  cancelItemSchema, updateItemStatusSchema, verifyItemSchema, requestChangesItemSchema, addNoteSchema, addEvidenceSchema,
   deleteItemSchema, updateItemSchema, reopenItemSchema,
   linkItemSchema, unlinkItemSchema,
 } from '../lib/schemas.js';
@@ -48,6 +48,8 @@ function getItemPermissions(item: typeof scoutItems.$inferSelect, user: typeof u
     canClaim: !isNote && item.status === 'new' && canWorkflow,
     canUpdateStatus: !isNote && canWorkflow,
     canResolve: !isNote && canWorkflow,
+    canVerify: !isNote && canTriage && (item.status === 'done' || item.status === 'testing'),
+    canRequestChanges: !isNote && canTriage && (item.status === 'review' || item.status === 'testing' || item.status === 'done' || item.status === 'verified'),
     canCancel: canTriage || canCancelOwnNew,
     canReopen: canTriage,
     canUpdate: canTriage,
@@ -102,6 +104,25 @@ function normalizeLinkPair(sourceItemId: string, targetItemId: string, type: Sco
   return sourceItemId < targetItemId
     ? { sourceItemId, targetItemId, type }
     : { sourceItemId: targetItemId, targetItemId: sourceItemId, type };
+}
+
+function addCommentNote(itemId: string, userId: string, content: string) {
+  const id = randomUUID();
+  db.insert(scoutItemNotes).values({
+    id, itemId, userId, content, type: 'comment',
+  }).run();
+  return db.select().from(scoutItemNotes).where(eq(scoutItemNotes.id, id)).get()!;
+}
+
+function formatRequestChangesNote(data: { summary: string; expected: string; actual: string; steps?: string; url?: string }) {
+  return [
+    'Нужны правки',
+    `Проблема: ${data.summary}`,
+    `Ожидалось: ${data.expected}`,
+    `Фактически: ${data.actual}`,
+    data.steps ? `Шаги: ${data.steps}` : null,
+    data.url ? `URL: ${data.url}` : null,
+  ].filter((line): line is string => Boolean(line)).join('\n');
 }
 
 export const itemRoutes = new Hono()
@@ -218,10 +239,9 @@ export const itemRoutes = new Hono()
       if (!checkProjectAccess(user.id, user.role, projectId, c.get('apiKey'))) {
         throw new ForbiddenError('Нет доступа к этому проекту', 'NO_PROJECT_ACCESS');
       }
-      const statuses = ['new', 'in_progress', 'review', 'testing', 'done', 'cancelled'] as const;
       const counts: Record<string, number> = {};
 
-      for (const status of statuses) {
+      for (const status of ITEM_STATUSES) {
         const [{ total }] = db.select({ total: count() }).from(scoutItems)
           .where(and(
             eq(scoutItems.projectId, projectId),
@@ -306,6 +326,10 @@ export const itemRoutes = new Hono()
       const { id, status, branchName, mrUrl, attemptCount, evidence } = c.req.valid('json');
       const user = c.get('user');
 
+      if (status === 'verified' || status === 'changes_requested') {
+        throw new ValidationError('Use the dedicated verification endpoints for human acceptance or requested changes', 'DEDICATED_VERIFICATION_ENDPOINT_REQUIRED');
+      }
+
       // Check project access via item's projectId
       const existing = db.select({ projectId: scoutItems.projectId }).from(scoutItems).where(eq(scoutItems.id, id)).get();
       if (!existing) throw new NotFoundError('Item', 'ITEM_NOT_FOUND');
@@ -319,6 +343,51 @@ export const itemRoutes = new Hono()
       dispatchWebhooks(existing.projectId, 'item.status_changed', { item, oldStatus, newStatus: status }).catch(() => {});
       eventBus.publish({ type: 'item.status_changed', projectId: existing.projectId, payload: { item, oldStatus, newStatus: status } });
       return c.json({ data: item });
+    })
+
+  // VERIFY — human acceptance after the AI agent has moved the item to done
+  .post('/verify',
+    zValidator('json', verifyItemSchema),
+    async (c) => {
+      const { id, comment, evidence } = c.req.valid('json');
+      const user = c.get('user');
+
+      const existing = db.select({ projectId: scoutItems.projectId, status: scoutItems.status }).from(scoutItems).where(eq(scoutItems.id, id)).get();
+      if (!existing) throw new NotFoundError('Item', 'ITEM_NOT_FOUND');
+      requireProjectPermission(user.id, user.role, existing.projectId, 'triage', c.get('apiKey'));
+
+      const item = updateItemStatus(id, 'verified', user, { evidence });
+      const trimmedComment = comment?.trim();
+      const note = trimmedComment ? addCommentNote(id, user.id, trimmedComment) : null;
+
+      logAudit({ userId: user.id, action: 'verify_item', entityType: 'item', entityId: id, ipAddress: getClientIp(c) });
+      dispatchWebhooks(existing.projectId, 'item.status_changed', { item, oldStatus: existing.status, newStatus: 'verified' }).catch(() => {});
+      if (note) dispatchWebhooks(existing.projectId, 'item.commented', { item, note }).catch(() => {});
+      eventBus.publish({ type: 'item.status_changed', projectId: existing.projectId, payload: { item, oldStatus: existing.status, newStatus: 'verified' } });
+      if (note) eventBus.publish({ type: 'item.commented', projectId: existing.projectId, payload: { itemId: id } });
+      return c.json({ data: enrichItem(item) });
+    })
+
+  // REQUEST CHANGES — human QA/reviewer rejection with actionable context for the agent
+  .post('/request-changes',
+    zValidator('json', requestChangesItemSchema),
+    async (c) => {
+      const { id, summary, expected, actual, steps, url, evidence } = c.req.valid('json');
+      const user = c.get('user');
+
+      const existing = db.select({ projectId: scoutItems.projectId, status: scoutItems.status }).from(scoutItems).where(eq(scoutItems.id, id)).get();
+      if (!existing) throw new NotFoundError('Item', 'ITEM_NOT_FOUND');
+      requireProjectPermission(user.id, user.role, existing.projectId, 'triage', c.get('apiKey'));
+
+      const item = updateItemStatus(id, 'changes_requested', user, { evidence });
+      const note = addCommentNote(id, user.id, formatRequestChangesNote({ summary, expected, actual, steps, url }));
+
+      logAudit({ userId: user.id, action: 'request_changes', entityType: 'item', entityId: id, details: { summary }, ipAddress: getClientIp(c) });
+      dispatchWebhooks(existing.projectId, 'item.status_changed', { item, oldStatus: existing.status, newStatus: 'changes_requested' }).catch(() => {});
+      dispatchWebhooks(existing.projectId, 'item.commented', { item, note }).catch(() => {});
+      eventBus.publish({ type: 'item.status_changed', projectId: existing.projectId, payload: { item, oldStatus: existing.status, newStatus: 'changes_requested' } });
+      eventBus.publish({ type: 'item.commented', projectId: existing.projectId, payload: { itemId: id } });
+      return c.json({ data: enrichItem(item) });
     })
 
   // DELETE — project manager/owner, or system admin

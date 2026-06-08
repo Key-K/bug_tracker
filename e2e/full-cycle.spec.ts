@@ -201,12 +201,23 @@ test.describe('Full bug lifecycle', () => {
     }, adminToken);
     expect(resolveStatus).toBe(200);
 
-    // Verify done status
+    // Verify done status: implementation is ready, but not human-accepted yet
     const { data: doneItem } = await apiPost('/items/get', { id: itemId }, adminToken);
     expect(doneItem.data.status).toBe('done');
     expect(doneItem.data.resolutionNote).toBe('Fixed in E2E test');
 
-    // Reopen (done → new)
+    // Human acceptance (done → verified)
+    const { status: verifyStatus } = await apiPost('/items/verify', {
+      id: itemId,
+      comment: 'E2E human acceptance check passed',
+    }, adminToken);
+    expect(verifyStatus).toBe(200);
+
+    const { data: verifiedItem } = await apiPost('/items/get', { id: itemId }, adminToken);
+    expect(verifiedItem.data.status).toBe('verified');
+    expect(verifiedItem.data.resolutionNote).toBe('Fixed in E2E test');
+
+    // Reopen (verified → new)
     const { status: reopenStatus } = await apiPost('/items/reopen', { id: itemId }, adminToken);
     expect(reopenStatus).toBe(200);
 

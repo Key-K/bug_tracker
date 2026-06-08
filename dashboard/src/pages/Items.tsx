@@ -52,10 +52,12 @@ interface Counts {
   review: number;
   testing: number;
   done: number;
+  changes_requested: number;
+  verified: number;
   cancelled: number;
 }
 
-const STATUSES = ['all', 'new', 'in_progress', 'review', 'testing', 'done', 'cancelled'] as const;
+const STATUSES = ['all', 'new', 'in_progress', 'review', 'testing', 'done', 'changes_requested', 'verified', 'cancelled'] as const;
 const ITEM_TYPES = ['all', 'bug', 'note', 'task'] as const;
 
 const STATUS_KEYS: Record<string, string> = {
@@ -65,6 +67,8 @@ const STATUS_KEYS: Record<string, string> = {
   review: 'items.statuses.review',
   testing: 'items.statuses.testing',
   done: 'items.statuses.done',
+  changes_requested: 'items.statuses.changes_requested',
+  verified: 'items.statuses.verified',
   cancelled: 'items.statuses.cancelled',
 };
 
@@ -123,6 +127,8 @@ export default function Items() {
     review: 0,
     testing: 0,
     done: 0,
+    changes_requested: 0,
+    verified: 0,
     cancelled: 0,
   });
   const [loading, setLoading] = useState(true);
@@ -323,8 +329,7 @@ export default function Items() {
     return `/items/${itemId}`;
   }
 
-  const totalAll =
-    counts.new + counts.in_progress + counts.review + counts.testing + counts.done + counts.cancelled;
+  const totalAll = Object.values(counts).reduce((sum, value) => sum + value, 0);
   const canCreateSelectedItem = selectedProject ? canCreateItems(selectedProject) : false;
 
   function getTabCount(status: string): number | null {

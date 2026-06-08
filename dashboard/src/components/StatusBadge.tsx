@@ -6,6 +6,8 @@ const colorMap: Record<string, string> = {
   review: 'bg-purple-100 text-purple-800',
   testing: 'bg-indigo-100 text-indigo-800',
   done: 'bg-green-100 text-green-800',
+  changes_requested: 'bg-red-100 text-red-800',
+  verified: 'bg-emerald-100 text-emerald-800',
   cancelled: 'bg-gray-100 text-gray-600',
 };
 

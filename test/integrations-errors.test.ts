@@ -204,12 +204,12 @@ describe('Error integrations routes', () => {
     expect(item?.status).toBe('done');
   });
 
-  it('reopens linked done item after regression cooldown', async () => {
+  it('reopens linked verified item after regression cooldown', async () => {
     vi.stubEnv('SCOUT_ERROR_REGRESSION_COOLDOWN_MS', String(60 * 60 * 1000));
     const key = await createApiKey(['errors:write']);
     const first = await upsert({ ...basePayload, projectId: ctx.projectId, occurredAt: '2026-01-01T00:00:00.000Z' }, key);
     const firstBody = await first.json() as any;
-    ctx.db.update(scoutItems).set({ status: 'done' }).where(eq(scoutItems.id, firstBody.data.errorGroup.linkedItemId)).run();
+    ctx.db.update(scoutItems).set({ status: 'verified' }).where(eq(scoutItems.id, firstBody.data.errorGroup.linkedItemId)).run();
 
     await upsert({ ...basePayload, projectId: ctx.projectId, occurredAt: '2026-01-01T02:00:00.000Z' }, key);
     const item = ctx.db.select().from(scoutItems).where(eq(scoutItems.id, firstBody.data.errorGroup.linkedItemId)).get();

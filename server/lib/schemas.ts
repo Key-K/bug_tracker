@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { WEBHOOK_EVENT_TYPES } from '../db/schema.js';
+import { ITEM_STATUSES, WEBHOOK_EVENT_TYPES } from '../db/schema.js';
 import { normalizeOrigin } from './origins.js';
 
 // === Shared ===
@@ -126,6 +126,7 @@ export const listUsersSchema = paginationSchema.extend({
 
 // === Items ===
 const itemTypeSchema = z.enum(['bug', 'note', 'task']);
+const itemStatusSchema = z.enum(ITEM_STATUSES);
 
 export const createItemSchema = z.object({
   projectId: uuidSchema,
@@ -149,8 +150,8 @@ export const createItemSchema = z.object({
 export const listItemsSchema = paginationSchema.extend({
   projectId: uuidSchema,
   itemType: itemTypeSchema.optional(),
-  status: z.enum(['new', 'in_progress', 'review', 'testing', 'done', 'cancelled']).optional(),
-  statuses: z.array(z.enum(['new', 'in_progress', 'review', 'testing', 'done', 'cancelled'])).min(1).max(6).optional(),
+  status: itemStatusSchema.optional(),
+  statuses: z.array(itemStatusSchema).min(1).max(ITEM_STATUSES.length).optional(),
   priority: z.enum(['critical', 'high', 'medium', 'low']).optional(),
   assigneeId: uuidSchema.optional(),
   search: z.string().max(200).optional(),
@@ -161,7 +162,7 @@ export const getItemSchema = z.object({ id: uuidSchema });
 export const countItemsSchema = z.object({
   projectId: uuidSchema,
   itemType: itemTypeSchema.optional(),
-  status: z.enum(['new', 'in_progress', 'review', 'testing', 'done', 'cancelled']).optional(),
+  status: itemStatusSchema.optional(),
 });
 
 export const claimItemSchema = z.object({ id: uuidSchema });
@@ -178,10 +179,26 @@ export const cancelItemSchema = z.object({ id: uuidSchema });
 
 export const updateItemStatusSchema = z.object({
   id: uuidSchema,
-  status: z.enum(['new', 'in_progress', 'review', 'testing', 'done', 'cancelled']),
+  status: itemStatusSchema,
   branchName: z.string().max(255).optional(),
   mrUrl: z.string().url().max(500).optional(),
   attemptCount: z.number().int().min(0).optional(),
+  evidence: itemEvidenceSchema.optional(),
+});
+
+export const verifyItemSchema = z.object({
+  id: uuidSchema,
+  comment: z.string().max(5000).optional(),
+  evidence: itemEvidenceSchema.optional(),
+});
+
+export const requestChangesItemSchema = z.object({
+  id: uuidSchema,
+  summary: z.string().min(3).max(2000),
+  expected: z.string().min(1).max(2000),
+  actual: z.string().min(1).max(2000),
+  steps: z.string().max(5000).optional(),
+  url: z.string().max(1000).optional(),
   evidence: itemEvidenceSchema.optional(),
 });
 

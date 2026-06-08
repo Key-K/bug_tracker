@@ -209,7 +209,13 @@ export function upsertErrorGroup(input: ErrorUpsertInput, resolvedProjectId?: st
     enforceOccurrenceLimit(tx, existing.id);
 
     if (reopenAsRegression && linkedItem) {
-      tx.update(scoutItems).set({ status: 'new', updatedAt: now() }).where(eq(scoutItems.id, linkedItem.id)).run();
+      tx.update(scoutItems).set({
+        status: 'new',
+        assigneeId: null,
+        resolvedById: null,
+        resolvedAt: null,
+        updatedAt: now(),
+      }).where(eq(scoutItems.id, linkedItem.id)).run();
       tx.insert(scoutItemNotes).values({
         id: randomUUID(),
         itemId: linkedItem.id,
@@ -231,7 +237,7 @@ function shouldReopenRegression(
   ignoredActive: boolean,
 ): boolean {
   if (ignoredActive) return false;
-  if (!linkedItem || (linkedItem.status !== 'done' && linkedItem.status !== 'cancelled')) return false;
+  if (!linkedItem || (linkedItem.status !== 'done' && linkedItem.status !== 'verified' && linkedItem.status !== 'cancelled')) return false;
 
   if (input.release && existing.lastRelease && input.release !== existing.lastRelease) return true;
 

@@ -190,6 +190,8 @@ describe('Items routes', () => {
     expect(body.data.counts.new).toBe(2);
     expect(body.data.counts.in_progress).toBe(0);
     expect(body.data.counts.testing).toBe(0);
+    expect(body.data.counts.changes_requested).toBe(0);
+    expect(body.data.counts.verified).toBe(0);
   });
 
   // === CLAIM ===
@@ -257,6 +259,52 @@ describe('Items routes', () => {
     }, ctx.developerToken);
 
     expect(res.status).toBe(400);
+  });
+
+  it('POST /verify — triager can accept a done item', async () => {
+    const item = await createTestItem();
+    await post('/claim', { id: item.id }, ctx.developerToken);
+    await resolveTestItem(item.id, ctx.developerToken, { resolutionNote: 'Fixed and ready for QA' });
+
+    const res = await post('/verify', {
+      id: item.id,
+      comment: 'Accepted by QA',
+    }, ctx.adminToken);
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as any;
+    expect(body.data.status).toBe('verified');
+    expect(body.data.resolvedAt).toBeTruthy();
+    expect(body.data.resolutionNote).toBe('Fixed and ready for QA');
+
+    const getRes = await post('/get', { id: item.id }, ctx.adminToken);
+    const getBody = await getRes.json() as any;
+    expect(getBody.data.notes.some((note: any) => note.content === 'Accepted by QA')).toBe(true);
+  });
+
+  it('POST /request-changes — triager can return a done item with actionable context', async () => {
+    const item = await createTestItem();
+    await post('/claim', { id: item.id }, ctx.developerToken);
+    await resolveTestItem(item.id);
+
+    const res = await post('/request-changes', {
+      id: item.id,
+      summary: 'Button still fails on mobile',
+      expected: 'Tap submits the form',
+      actual: 'Tap does nothing',
+      steps: 'Open the page at mobile width and tap Submit',
+      url: 'http://localhost:3000/page',
+    }, ctx.adminToken);
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as any;
+    expect(body.data.status).toBe('changes_requested');
+    expect(body.data.resolvedAt).toBeNull();
+    expect(body.data.resolvedById).toBeNull();
+
+    const getRes = await post('/get', { id: item.id }, ctx.adminToken);
+    const getBody = await getRes.json() as any;
+    expect(getBody.data.notes.some((note: any) => note.content.includes('Button still fails on mobile'))).toBe(true);
   });
 
   // === CANCEL ===
@@ -666,6 +714,19 @@ describe('Items routes', () => {
     expect(doneRes.status).toBe(200);
     const doneBody = await doneRes.json() as any;
     expect(doneBody.data.status).toBe('done');
+  });
+
+  it('POST /update-status — rejects human-only statuses', async () => {
+    const item = await createTestItem();
+    await post('/claim', { id: item.id }, ctx.developerToken);
+    await resolveTestItem(item.id);
+
+    const res = await post('/update-status', {
+      id: item.id,
+      status: 'verified',
+    }, ctx.developerToken);
+
+    expect(res.status).toBe(400);
   });
 
   it('POST /update-status — review requires evidence', async () => {

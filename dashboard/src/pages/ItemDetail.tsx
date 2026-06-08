@@ -78,6 +78,14 @@ type EvidenceDraft = {
   acceptanceScope: string;
 };
 
+type ChangeRequestDraft = {
+  summary: string;
+  expected: string;
+  actual: string;
+  steps: string;
+  url: string;
+};
+
 interface UserListItem {
   id: string;
   name: string;
@@ -144,6 +152,8 @@ interface ItemPermissions {
   canClaim: boolean;
   canUpdateStatus: boolean;
   canResolve: boolean;
+  canVerify: boolean;
+  canRequestChanges: boolean;
   canCancel: boolean;
   canReopen: boolean;
   canUpdate: boolean;
@@ -215,6 +225,14 @@ const initialEvidenceDraft: EvidenceDraft = {
   risks: '',
   uncheckedRisks: '',
   acceptanceScope: '',
+};
+
+const initialChangeRequestDraft: ChangeRequestDraft = {
+  summary: '',
+  expected: '',
+  actual: '',
+  steps: '',
+  url: '',
 };
 
 const evidenceRequiredFields: Array<keyof EvidenceDraft> = ['environment', 'scenario', 'action', 'visibleResult'];
@@ -382,6 +400,10 @@ export default function ItemDetail() {
   const [branchName, setBranchName] = useState('');
   const [mrUrl, setMrUrl] = useState('');
   const [evidenceDraft, setEvidenceDraft] = useState<EvidenceDraft>(initialEvidenceDraft);
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [verifyComment, setVerifyComment] = useState('');
+  const [showChangesModal, setShowChangesModal] = useState(false);
+  const [changeRequest, setChangeRequest] = useState<ChangeRequestDraft>(initialChangeRequestDraft);
 
   // Edit mode state
   const [editing, setEditing] = useState(false);
@@ -516,6 +538,9 @@ export default function ItemDetail() {
   function openHandoffModal(status: HandoffStatus) {
     if (!item) return;
     setHandoffStatus(status);
+    setResolutionNote('');
+    setBranchName('');
+    setMrUrl('');
     setEvidenceDraft({
       ...initialEvidenceDraft,
       url: item.pageUrl ?? '',
@@ -575,6 +600,65 @@ export default function ItemDetail() {
     }
   }
 
+  function openVerifyModal() {
+    setVerifyComment('');
+    setShowVerifyModal(true);
+  }
+
+  function openChangesModal() {
+    setChangeRequest({
+      ...initialChangeRequestDraft,
+      url: item?.pageUrl ?? '',
+    });
+    setShowChangesModal(true);
+  }
+
+  function updateChangeRequestField(field: keyof ChangeRequestDraft, value: string) {
+    setChangeRequest((current) => ({ ...current, [field]: value }));
+  }
+
+  const changeRequestReady = Boolean(changeRequest.summary.trim() && changeRequest.expected.trim() && changeRequest.actual.trim());
+
+  async function handleVerify() {
+    if (!item) return;
+    setActionLoading(true);
+    try {
+      await api('/api/items/verify', {
+        id: item.id,
+        comment: verifyComment.trim() || undefined,
+      });
+      setShowVerifyModal(false);
+      setVerifyComment('');
+      await loadItem();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('validation.requestError'));
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleRequestChanges() {
+    if (!item || !changeRequestReady) return;
+    setActionLoading(true);
+    try {
+      await api('/api/items/request-changes', {
+        id: item.id,
+        summary: changeRequest.summary.trim(),
+        expected: changeRequest.expected.trim(),
+        actual: changeRequest.actual.trim(),
+        steps: changeRequest.steps.trim() || undefined,
+        url: changeRequest.url.trim() || undefined,
+      });
+      setShowChangesModal(false);
+      setChangeRequest(initialChangeRequestDraft);
+      await loadItem();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('validation.requestError'));
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
   async function handleDelete() {
     if (!item) return;
     if (!window.confirm(t('items.detail.deleteConfirm'))) return;
@@ -594,7 +678,6 @@ export default function ItemDetail() {
     try {
       await api('/api/items/reopen', {
         id: item.id,
-        ...(item.itemType !== 'note' && item.status === 'done' ? { status: 'in_progress', reason: 'manual' } : {}),
       });
       await loadItem();
     } catch (err) {
@@ -778,7 +861,7 @@ export default function ItemDetail() {
 
   const meta = parseMetadata(item.metadata);
 
-  const isTerminal = item.status === 'done' || item.status === 'cancelled';
+  const isTerminal = item.status === 'verified' || item.status === 'cancelled';
 
   return (
     <div className="p-4 md:p-6 max-w-5xl">
@@ -954,6 +1037,26 @@ export default function ItemDetail() {
                 )}
               </>
             )}
+            {item.status === 'changes_requested' && item.permissions.canUpdateStatus && (
+              <>
+                <button
+                  onClick={() => handleAction('update-status', { status: 'in_progress' })}
+                  disabled={actionLoading}
+                  className="w-full md:w-auto rounded-md bg-blue-600 px-3 py-2 md:py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {t('items.detail.actions.claim')}
+                </button>
+                {item.permissions.canCancel && (
+                  <button
+                    onClick={() => handleAction('cancel')}
+                    disabled={actionLoading}
+                    className="w-full md:w-auto rounded-md border border-gray-300 px-3 py-2 md:py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    {t('items.detail.actions.cancel')}
+                  </button>
+                )}
+              </>
+            )}
             {item.status === 'review' && item.permissions.canUpdateStatus && (
               <>
                 <button
@@ -1003,13 +1106,40 @@ export default function ItemDetail() {
                 </button>
               </>
             )}
-            {isTerminal && item.permissions.canReopen && (item.itemType !== 'note' || item.status === 'cancelled') && (
+            {item.status === 'done' && item.permissions.canUpdateStatus && (
+              <button
+                onClick={() => handleAction('update-status', { status: 'testing' })}
+                disabled={actionLoading}
+                className="w-full md:w-auto rounded-md bg-indigo-600 px-3 py-2 md:py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {t('items.detail.actions.testing')}
+              </button>
+            )}
+            {item.permissions.canVerify && (
+              <button
+                onClick={openVerifyModal}
+                disabled={actionLoading}
+                className="w-full md:w-auto rounded-md bg-emerald-600 px-3 py-2 md:py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {t('items.detail.actions.verify')}
+              </button>
+            )}
+            {item.permissions.canRequestChanges && (
+              <button
+                onClick={openChangesModal}
+                disabled={actionLoading}
+                className="w-full md:w-auto rounded-md border border-red-200 px-3 py-2 md:py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+              >
+                {t('items.detail.actions.requestChanges')}
+              </button>
+            )}
+            {item.status === 'cancelled' && item.permissions.canReopen && (item.itemType !== 'note' || item.status === 'cancelled') && (
               <button
                 onClick={handleReopen}
                 disabled={actionLoading}
                 className="w-full md:w-auto rounded-md bg-yellow-500 px-3 py-2 md:py-1.5 text-sm font-medium text-white hover:bg-yellow-600 disabled:opacity-50"
               >
-                {item.status === 'done' ? t('items.detail.actions.returnToWork') : t('items.detail.actions.reopen')}
+                {t('items.detail.actions.reopen')}
               </button>
             )}
             {item.permissions.canDelete && (
@@ -1135,8 +1265,8 @@ export default function ItemDetail() {
         </div>
       )}
 
-      {/* Resolution section — shown when status is done */}
-      {item.status === 'done' && (item.branchName || item.mrUrl || item.resolvedAt || item.resolutionNote) && (
+      {/* Resolution section — shown once implementation is done, including after human verification */}
+      {(item.status === 'done' || item.status === 'verified') && (item.branchName || item.mrUrl || item.resolvedAt || item.resolutionNote) && (
         <div className="mb-4 md:mb-6 rounded-lg border border-green-200 bg-green-50 p-3 md:p-4">
           <h3 className="mb-3 text-sm font-medium text-green-800">{t('items.detail.resolution.title')}</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1407,24 +1537,18 @@ export default function ItemDetail() {
       {/* Review/done handoff modal — full screen on mobile, centered on desktop */}
       {showHandoffModal && (
         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40">
-          <div className="w-full md:max-w-2xl rounded-t-xl md:rounded-lg border border-gray-200 bg-white p-5 md:p-6 shadow-xl max-h-[90vh] overflow-y-auto">
-            <h3 className="mb-4 text-lg font-semibold text-gray-900">
+          <div className="w-full md:max-w-2xl rounded-t-xl md:rounded-lg border border-gray-200 bg-white p-5 md:p-6 shadow-xl max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="handoff-dialog-title">
+            <h3 id="handoff-dialog-title" className="mb-4 text-lg font-semibold text-gray-900">
               {handoffStatus === 'done' ? t('items.detail.resolve.title') : t('items.detail.review.title')}
             </h3>
             <p className="mb-4 text-sm text-gray-500">{t('items.detail.evidence.requiredHint')}</p>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <label className="block">
-                <span className="text-sm font-medium text-gray-700">{t('items.detail.evidence.result')} *</span>
-                <select
-                  value={evidenceDraft.result}
-                  onChange={(e) => updateEvidenceField('result', e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                >
-                  {(['pass', 'fail', 'blocked', 'partial'] as const).map((result) => (
-                    <option key={result} value={result}>{t(`items.detail.evidence.results.${result}`)}</option>
-                  ))}
-                </select>
-              </label>
+              <div>
+                <span className="text-sm font-medium text-gray-700">{t('items.detail.evidence.result')}</span>
+                <div className="mt-1 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">
+                  {t('items.detail.evidence.results.pass')}
+                </div>
+              </div>
               <label className="block">
                 <span className="text-sm font-medium text-gray-700">{t('items.detail.evidence.level')} *</span>
                 <select
@@ -1581,6 +1705,125 @@ export default function ItemDetail() {
                 className="w-full md:w-auto rounded-md bg-green-600 px-4 py-2 md:py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
               >
                 {actionLoading ? t('items.detail.resolve.saving') : (handoffStatus === 'done' ? t('items.detail.resolve.submit') : t('items.detail.review.submit'))}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showVerifyModal && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 md:items-center">
+          <div className="w-full rounded-t-xl border border-gray-200 bg-white p-5 shadow-xl md:max-w-lg md:rounded-lg md:p-6" role="dialog" aria-modal="true" aria-labelledby="verify-dialog-title">
+            <h3 id="verify-dialog-title" className="text-lg font-semibold text-gray-900">{t('items.detail.verify.title')}</h3>
+            <p className="mt-1 text-sm text-gray-500">{t('items.detail.verify.description')}</p>
+            <label className="mt-4 block">
+              <span className="text-sm font-medium text-gray-700">{t('items.detail.verify.comment')}</span>
+              <textarea
+                name="verify-comment"
+                value={verifyComment}
+                onChange={(e) => setVerifyComment(e.target.value)}
+                rows={4}
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                placeholder={t('items.detail.verify.commentPlaceholder')}
+              />
+            </label>
+            <div className="mt-5 flex flex-col-reverse gap-2 md:flex-row md:justify-end">
+              <button
+                type="button"
+                onClick={() => setShowVerifyModal(false)}
+                className="w-full rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 md:w-auto md:py-1.5"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={handleVerify}
+                disabled={actionLoading}
+                className="w-full rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50 md:w-auto md:py-1.5"
+              >
+                {actionLoading ? t('common.saving') : t('items.detail.verify.submit')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showChangesModal && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 md:items-center">
+          <div className="w-full rounded-t-xl border border-gray-200 bg-white p-5 shadow-xl md:max-w-2xl md:rounded-lg md:p-6" role="dialog" aria-modal="true" aria-labelledby="changes-dialog-title">
+            <h3 id="changes-dialog-title" className="text-lg font-semibold text-gray-900">{t('items.detail.requestChanges.title')}</h3>
+            <p className="mt-1 text-sm text-gray-500">{t('items.detail.requestChanges.description')}</p>
+            <div className="mt-4 grid gap-3">
+              <label className="block">
+                <span className="text-sm font-medium text-gray-700">{t('items.detail.requestChanges.summary')} *</span>
+                <textarea
+                  name="request-changes-summary"
+                  value={changeRequest.summary}
+                  onChange={(e) => updateChangeRequestField('summary', e.target.value)}
+                  rows={2}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  placeholder={t('items.detail.requestChanges.summaryPlaceholder')}
+                />
+              </label>
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="block">
+                  <span className="text-sm font-medium text-gray-700">{t('items.detail.requestChanges.expected')} *</span>
+                  <textarea
+                    name="request-changes-expected"
+                    value={changeRequest.expected}
+                    onChange={(e) => updateChangeRequestField('expected', e.target.value)}
+                    rows={3}
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium text-gray-700">{t('items.detail.requestChanges.actual')} *</span>
+                  <textarea
+                    name="request-changes-actual"
+                    value={changeRequest.actual}
+                    onChange={(e) => updateChangeRequestField('actual', e.target.value)}
+                    rows={3}
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  />
+                </label>
+              </div>
+              <label className="block">
+                <span className="text-sm font-medium text-gray-700">{t('items.detail.requestChanges.steps')}</span>
+                <textarea
+                  name="request-changes-steps"
+                  value={changeRequest.steps}
+                  onChange={(e) => updateChangeRequestField('steps', e.target.value)}
+                  rows={3}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm font-medium text-gray-700">{t('items.detail.requestChanges.url')}</span>
+                <input
+                  type="url"
+                  name="request-changes-url"
+                  value={changeRequest.url}
+                  onChange={(e) => updateChangeRequestField('url', e.target.value)}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  placeholder="https://example.com/path"
+                />
+              </label>
+            </div>
+            <div className="mt-5 flex flex-col-reverse gap-2 md:flex-row md:justify-end">
+              <button
+                type="button"
+                onClick={() => setShowChangesModal(false)}
+                className="w-full rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 md:w-auto md:py-1.5"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={handleRequestChanges}
+                disabled={actionLoading || !changeRequestReady}
+                className="w-full rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 md:w-auto md:py-1.5"
+              >
+                {actionLoading ? t('common.saving') : t('items.detail.requestChanges.submit')}
               </button>
             </div>
           </div>
