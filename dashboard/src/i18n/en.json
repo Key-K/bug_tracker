@@ -49,7 +49,6 @@
   "items.types.bug": "Bug",
   "items.types.note": "Note",
   "items.types.task": "Task",
-  "items.statuses.all": "All",
   "items.statuses.new": "New",
   "items.statuses.in_progress": "In progress",
   "items.statuses.review": "Needs review",

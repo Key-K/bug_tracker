@@ -49,7 +49,6 @@
   "items.types.bug": "Баг",
   "items.types.note": "Заметка",
   "items.types.task": "Задача",
-  "items.statuses.all": "Все",
   "items.statuses.new": "Новые",
   "items.statuses.in_progress": "В работе",
   "items.statuses.review": "Нужна проверка",

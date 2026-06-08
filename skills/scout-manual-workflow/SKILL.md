@@ -33,7 +33,7 @@ The slash command surface is intentionally one command: `/scout`. Optimize this 
 
 1. If the user provides a Scout item id or item URL, run single-item mode: fetch that item, inspect related items, and handle the item end-to-end. Include related items only when evidence shows the same root cause or a direct blocker.
 2. If the user asks for the next/one Scout task, run single-next mode: choose exactly one next actionable item or one evidence-backed shared-root cluster.
-3. If the user explicitly asks for all/full queue work, run full active queue mode. Continue through actionable `changes_requested`, `review`, `in_progress`, `new`, and triage-worthy `note` items until no item can honestly move further with the available access and safety constraints.
+3. If the user explicitly asks for all/full queue work, run full active queue mode. Continue through actionable `changes_requested`, `review`, `in_progress`, `new`, and triage-worthy `note` items until no item can honestly move further with the available access and safety constraints. Treat the UI `Needs Review` queue as `review` plus `changes_requested`, not as a separate status.
 4. If the user invokes bare `/scout` with no narrowing text, run single-next mode: choose exactly one next actionable item or one evidence-backed shared-root cluster.
 5. Always build the readiness matrix internally; expose it only when it affects the final decision, a blocker, or the user's understanding.
 6. Audit `done` or `verified` items only when the user's request explicitly asks to recheck completed/accepted/closed work. Normal Scout work does not disturb `done` awaiting human acceptance or `verified` human-accepted items.
@@ -169,7 +169,18 @@ Never use code changes as a way to guess through an unclear note. The AI agent c
 
 When selecting work from a project rather than a specific item, first inspect the queue like a bug triage owner, not like a FIFO script.
 
-1. List open items across relevant statuses: `changes_requested`, `review`, `in_progress`, and `new` when appropriate. Prefer one `/api/items/list` call with `statuses` when Scout supports it; otherwise make separate status calls. Do not filter notes out; if the combined list cannot include all item types, run an additional note-specific list call so useful notes can be converted by AI triage instead of waiting for a developer.
+Human queue tabs are status groups, not separate states:
+
+| Queue | Scout statuses |
+|-------|----------------|
+| `Open` | `new` |
+| `In Progress` | `in_progress` |
+| `Needs Review` | `review`, `changes_requested` |
+| `Needs Acceptance` | `done` |
+| `Accepted` | `verified` |
+| `Archived` | `cancelled` |
+
+1. List active work across relevant statuses: `changes_requested`, `review`, `in_progress`, and `new` when appropriate. Prefer one `/api/items/list` call with `statuses` when Scout supports it; otherwise make separate status calls. Do not filter notes out; if the combined list cannot include all item types, run an additional note-specific list call so useful notes can be converted by AI triage instead of waiting for a developer.
 2. Sort by severity and urgency first, then age:
    - `critical`: production outage, data loss/corruption, security/privacy issue, broken core workflow.
    - `high`: major user-visible failure, blocked important workflow, strong business impact.
@@ -515,7 +526,7 @@ Completion note format:
 ```text
 Итог: <что исправлено или что заблокировано>
 Проверка: <самые важные checks и результат>
-Статус: <in_progress/review/done/changes_requested>, <commit/PR/branch/deploy>, <риск или "рисков не вижу">
+Статус: <new/in_progress/review/done/changes_requested/verified/cancelled>, <commit/PR/branch/deploy>, <риск или "рисков не вижу">
 ```
 
 ## Status Handling
@@ -531,6 +542,8 @@ Status meanings:
 - `changes_requested`: a human reviewer or explicit audit rejected the current result with expected/actual context. Treat it as high-priority actionable work unless the rejection itself is unclear.
 - `verified`: human acceptance is complete. Treat it as terminal unless the user explicitly asks for an audit, a regression reopens it, or a human requests changes.
 - `cancelled`: the agent determined the item is duplicate, invalid, not applicable, intentionally abandoned, or outside scope, and recorded why in Scout.
+
+Use the `Queue Triage` table for UI queue-to-status mapping. Do not invent queue-only workflow statuses.
 
 Status transition algorithm for OpenCode:
 

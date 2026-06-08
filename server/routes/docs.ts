@@ -583,7 +583,7 @@ const spec = {
                   projectId: { type: 'string', format: 'uuid' },
                   itemType: { $ref: '#/components/schemas/ItemType' },
                   status: { $ref: '#/components/schemas/ItemStatus' },
-                  statuses: { type: 'array', items: { $ref: '#/components/schemas/ItemStatus' }, minItems: 1, maxItems: ITEM_STATUSES.length, description: 'Filter by multiple statuses, useful for open queue triage. If status is provided, status takes precedence.' },
+                  statuses: { type: 'array', items: { $ref: '#/components/schemas/ItemStatus' }, minItems: 1, maxItems: ITEM_STATUSES.length, description: 'Filter by multiple statuses, useful for human queue groups such as Needs Review = review + changes_requested. If status is provided, status takes precedence.' },
                   priority: { $ref: '#/components/schemas/ItemPriority' },
                   assigneeId: { type: 'string', format: 'uuid' },
                   search: { type: 'string', maxLength: 200, description: 'Поиск по тексту сообщения (LIKE)' },
