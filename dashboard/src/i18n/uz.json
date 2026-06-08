@@ -205,7 +205,7 @@
   "items.detail.evidence.sources.ci": "CI",
   "items.detail.evidence.sources.deploy": "Deploy",
   "items.detail.evidence.sources.audit": "Audit",
-  "items.detail.resolution.title": "Yechim",
+  "items.detail.resolution.title": "Ish konteksti",
   "items.detail.resolution.branch": "Tarmoq",
   "items.detail.resolution.mrUrl": "Merge Request",
   "items.detail.resolution.date": "Yechilgan sana",

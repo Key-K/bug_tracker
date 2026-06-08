@@ -205,7 +205,7 @@
   "items.detail.evidence.sources.ci": "CI",
   "items.detail.evidence.sources.deploy": "Deploy",
   "items.detail.evidence.sources.audit": "Audit",
-  "items.detail.resolution.title": "Resolution",
+  "items.detail.resolution.title": "Workflow context",
   "items.detail.resolution.branch": "Branch",
   "items.detail.resolution.mrUrl": "Merge Request",
   "items.detail.resolution.date": "Resolved at",

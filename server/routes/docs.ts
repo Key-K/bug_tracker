@@ -583,7 +583,7 @@ const spec = {
                   projectId: { type: 'string', format: 'uuid' },
                   itemType: { $ref: '#/components/schemas/ItemType' },
                   status: { $ref: '#/components/schemas/ItemStatus' },
-                  statuses: { type: 'array', items: { $ref: '#/components/schemas/ItemStatus' }, minItems: 1, maxItems: 6, description: 'Filter by multiple statuses, useful for open queue triage. If status is provided, status takes precedence.' },
+                  statuses: { type: 'array', items: { $ref: '#/components/schemas/ItemStatus' }, minItems: 1, maxItems: ITEM_STATUSES.length, description: 'Filter by multiple statuses, useful for open queue triage. If status is provided, status takes precedence.' },
                   priority: { $ref: '#/components/schemas/ItemPriority' },
                   assigneeId: { type: 'string', format: 'uuid' },
                   search: { type: 'string', maxLength: 200, description: 'Поиск по тексту сообщения (LIKE)' },
@@ -758,7 +758,7 @@ const spec = {
     '/items/resolve': {
       post: {
         tags: ['Items'],
-        summary: 'Закрыть item (resolve)',
+        summary: 'Подготовить item к human acceptance (resolve)',
         description: 'Переводит item в статус done: implementation/evidence complete, waiting for human acceptance. Для done/review требуется свежий structured evidence record или evidence в этом запросе. Agent automation should include result, level, coverage, environment, scenario, action, visibleResult, and item-specific acceptanceScope. Требуется project permission `workflow` (admin/owner/manager/developer).',
         security: [{ BearerAuth: [] }],
         requestBody: {
@@ -823,7 +823,7 @@ const spec = {
       post: {
         tags: ['Items'],
         summary: 'Обновить статус item',
-        description: 'Универсальный эндпоинт для инженерных workflow-переходов. Переходы в review/done требуют свежий structured evidence record или evidence в этом запросе. Human acceptance statuses `verified` and `changes_requested` must use `/items/verify` and `/items/request-changes`. Требуется project permission `workflow` (admin/owner/manager/developer).',
+        description: 'Универсальный эндпоинт только для инженерных workflow-переходов в `in_progress`, `review` или `testing`. Используйте `/items/claim` для начала нового item, `/items/resolve` для `done`, `/items/verify` для `verified`, `/items/request-changes` для `changes_requested`, `/items/cancel` для `cancelled` и `/items/reopen` для возврата в `new`. Переход в review требует свежий structured evidence record или evidence в этом запросе. Требуется project permission `workflow` (admin/owner/manager/developer).',
         security: [{ BearerAuth: [] }, { ApiKeyAuth: [] }],
         requestBody: {
           required: true,
@@ -834,7 +834,7 @@ const spec = {
                 required: ['id', 'status'],
                 properties: {
                   id: { type: 'string', format: 'uuid' },
-                  status: { $ref: '#/components/schemas/ItemStatus' },
+                  status: { type: 'string', enum: ['in_progress', 'review', 'testing'] },
                   branchName: { type: 'string', maxLength: 255 },
                   mrUrl: { type: 'string', format: 'uri', maxLength: 500 },
                   attemptCount: { type: 'integer', minimum: 0 },

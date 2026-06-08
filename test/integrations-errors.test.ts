@@ -6,7 +6,8 @@ import { eq } from 'drizzle-orm';
 import { integrationsErrorsRoutes } from '../server/routes/integrations-errors.js';
 import { enqueueBridgeJob, getBridgeStatus, processBridgeJobs } from '../server/services/error-groups.js';
 import { createTestContext, type TestContext } from './helpers.js';
-import { apiKeys, errorGroupOccurrences, errorGroups, projects, scoutBridgeJobs, scoutItems } from '../server/db/schema.js';
+import { apiKeys, auditLog, errorGroupOccurrences, errorGroups, projects, scoutBridgeJobs, scoutItems } from '../server/db/schema.js';
+import { eventBus, type SSEEvent } from '../server/lib/event-bus.js';
 
 vi.mock('../server/db/client.js', async () => {
   return { db: null, sqlite: { close: () => {} } };
@@ -210,10 +211,20 @@ describe('Error integrations routes', () => {
     const first = await upsert({ ...basePayload, projectId: ctx.projectId, occurredAt: '2026-01-01T00:00:00.000Z' }, key);
     const firstBody = await first.json() as any;
     ctx.db.update(scoutItems).set({ status: 'verified' }).where(eq(scoutItems.id, firstBody.data.errorGroup.linkedItemId)).run();
+    const events: SSEEvent[] = [];
+    const unsubscribe = eventBus.subscribe((event) => events.push(event));
 
     await upsert({ ...basePayload, projectId: ctx.projectId, occurredAt: '2026-01-01T02:00:00.000Z' }, key);
+    unsubscribe();
     const item = ctx.db.select().from(scoutItems).where(eq(scoutItems.id, firstBody.data.errorGroup.linkedItemId)).get();
     expect(item?.status).toBe('new');
+
+    expect(events.some((event) => event.type === 'item.status_changed'
+      && event.projectId === ctx.projectId
+      && event.payload.oldStatus === 'verified'
+      && event.payload.newStatus === 'new')).toBe(true);
+    const audit = ctx.db.select().from(auditLog).where(eq(auditLog.entityId, firstBody.data.errorGroup.linkedItemId)).all();
+    expect(audit.some((entry) => entry.action === 'reopen_item' && entry.details?.includes('regression'))).toBe(true);
   });
 
   it('reopens linked done item when release changes', async () => {

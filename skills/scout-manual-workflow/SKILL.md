@@ -481,7 +481,7 @@ Default note structure:
 
 1. Итог: what changed or what is blocked.
 2. Проверка: the strongest fresh evidence, not every command.
-3. Статус: `in_progress`, `review`, `testing`, `done`, `changes_requested`, blocker, commit/PR, or next action.
+3. Статус/следующий шаг: `in_progress`, `review`, `testing`, `done`, `changes_requested`, exact blocker, commit/PR, or next action.
 
 Use technical terms only when they help review or reproduce the issue. Explain consequence, not line-by-line implementation. Put raw logs, long matrices, or detailed command output in an artifact or PR comment only when Scout needs that level of evidence.
 

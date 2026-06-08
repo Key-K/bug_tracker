@@ -202,6 +202,8 @@ const noteTypeColors: Record<string, string> = {
   resolution: 'bg-green-100 text-green-700',
 };
 
+const itemStatusIds = ['new', 'in_progress', 'review', 'testing', 'done', 'changes_requested', 'verified', 'cancelled'];
+
 const initialEvidenceDraft: EvidenceDraft = {
   kind: 'handoff',
   result: 'pass',
@@ -392,6 +394,7 @@ export default function ItemDetail() {
   const [noteContent, setNoteContent] = useState('');
   const [noteSaving, setNoteSaving] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [modalError, setModalError] = useState('');
 
   // Review/done handoff modal state
   const [showHandoffModal, setShowHandoffModal] = useState(false);
@@ -537,6 +540,8 @@ export default function ItemDetail() {
 
   function openHandoffModal(status: HandoffStatus) {
     if (!item) return;
+    setError('');
+    setModalError('');
     setHandoffStatus(status);
     setResolutionNote('');
     setBranchName('');
@@ -568,6 +573,7 @@ export default function ItemDetail() {
   async function handleHandoff() {
     if (!item || !evidenceReady) return;
     setActionLoading(true);
+    setModalError('');
     try {
       const evidence = buildEvidencePayload();
       if (handoffStatus === 'done') {
@@ -594,18 +600,22 @@ export default function ItemDetail() {
       setEvidenceDraft(initialEvidenceDraft);
       await loadItem();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('validation.requestError'));
+      setModalError(err instanceof Error ? err.message : t('validation.requestError'));
     } finally {
       setActionLoading(false);
     }
   }
 
   function openVerifyModal() {
+    setError('');
+    setModalError('');
     setVerifyComment('');
     setShowVerifyModal(true);
   }
 
   function openChangesModal() {
+    setError('');
+    setModalError('');
     setChangeRequest({
       ...initialChangeRequestDraft,
       url: item?.pageUrl ?? '',
@@ -622,6 +632,7 @@ export default function ItemDetail() {
   async function handleVerify() {
     if (!item) return;
     setActionLoading(true);
+    setModalError('');
     try {
       await api('/api/items/verify', {
         id: item.id,
@@ -631,7 +642,7 @@ export default function ItemDetail() {
       setVerifyComment('');
       await loadItem();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('validation.requestError'));
+      setModalError(err instanceof Error ? err.message : t('validation.requestError'));
     } finally {
       setActionLoading(false);
     }
@@ -640,6 +651,7 @@ export default function ItemDetail() {
   async function handleRequestChanges() {
     if (!item || !changeRequestReady) return;
     setActionLoading(true);
+    setModalError('');
     try {
       await api('/api/items/request-changes', {
         id: item.id,
@@ -653,7 +665,7 @@ export default function ItemDetail() {
       setChangeRequest(initialChangeRequestDraft);
       await loadItem();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('validation.requestError'));
+      setModalError(err instanceof Error ? err.message : t('validation.requestError'));
     } finally {
       setActionLoading(false);
     }
@@ -809,7 +821,10 @@ export default function ItemDetail() {
   function renderNoteContent(content: string) {
     const autoNote = parseAutoNote(content);
     if (autoNote) {
-      return t(autoNote.key, autoNote.params);
+      const params = autoNote.params ? { ...autoNote.params } : undefined;
+      if (params?.from && itemStatusIds.includes(params.from)) params.from = t(`items.statuses.${params.from}`);
+      if (params?.to && itemStatusIds.includes(params.to)) params.to = t(`items.statuses.${params.to}`);
+      return t(autoNote.key, params);
     }
     return renderPlainNoteContent(content);
   }
@@ -1044,7 +1059,7 @@ export default function ItemDetail() {
                   disabled={actionLoading}
                   className="w-full md:w-auto rounded-md bg-blue-600 px-3 py-2 md:py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
                 >
-                  {t('items.detail.actions.claim')}
+                  {t('items.detail.actions.returnToWork')}
                 </button>
                 {item.permissions.canCancel && (
                   <button
@@ -1265,8 +1280,8 @@ export default function ItemDetail() {
         </div>
       )}
 
-      {/* Resolution section — shown once implementation is done, including after human verification */}
-      {(item.status === 'done' || item.status === 'verified') && (item.branchName || item.mrUrl || item.resolvedAt || item.resolutionNote) && (
+      {/* Resolution / handoff context should remain visible after review or requested changes. */}
+      {(item.branchName || item.mrUrl || item.resolvedAt || item.resolutionNote) && (
         <div className="mb-4 md:mb-6 rounded-lg border border-green-200 bg-green-50 p-3 md:p-4">
           <h3 className="mb-3 text-sm font-medium text-green-800">{t('items.detail.resolution.title')}</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1692,9 +1707,14 @@ export default function ItemDetail() {
                 />
               </label>
             )}
+            {modalError && (
+              <div className="mt-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {modalError}
+              </div>
+            )}
             <div className="mt-5 flex flex-col-reverse gap-2 md:flex-row md:justify-end">
               <button
-                onClick={() => setShowHandoffModal(false)}
+                onClick={() => { setShowHandoffModal(false); setModalError(''); }}
                 className="w-full md:w-auto rounded-md border border-gray-300 px-4 py-2 md:py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
                 {t('common.cancel')}
@@ -1727,10 +1747,15 @@ export default function ItemDetail() {
                 placeholder={t('items.detail.verify.commentPlaceholder')}
               />
             </label>
+            {modalError && (
+              <div className="mt-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {modalError}
+              </div>
+            )}
             <div className="mt-5 flex flex-col-reverse gap-2 md:flex-row md:justify-end">
               <button
                 type="button"
-                onClick={() => setShowVerifyModal(false)}
+                onClick={() => { setShowVerifyModal(false); setModalError(''); }}
                 className="w-full rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 md:w-auto md:py-1.5"
               >
                 {t('common.cancel')}
@@ -1809,10 +1834,15 @@ export default function ItemDetail() {
                 />
               </label>
             </div>
+            {modalError && (
+              <div className="mt-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {modalError}
+              </div>
+            )}
             <div className="mt-5 flex flex-col-reverse gap-2 md:flex-row md:justify-end">
               <button
                 type="button"
-                onClick={() => setShowChangesModal(false)}
+                onClick={() => { setShowChangesModal(false); setModalError(''); }}
                 className="w-full rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 md:w-auto md:py-1.5"
               >
                 {t('common.cancel')}

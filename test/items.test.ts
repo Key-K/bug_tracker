@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Hono } from 'hono';
 import { itemRoutes } from '../server/routes/items.js';
-import { projects } from '../server/db/schema.js';
+import { projects, scoutItems } from '../server/db/schema.js';
 import { createTestContext, type TestContext } from './helpers.js';
 import { randomUUID } from 'node:crypto';
+import { eq } from 'drizzle-orm';
 
 // Mock the db module
 vi.mock('../server/db/client.js', async () => {
@@ -721,12 +722,49 @@ describe('Items routes', () => {
     await post('/claim', { id: item.id }, ctx.developerToken);
     await resolveTestItem(item.id);
 
-    const res = await post('/update-status', {
+    const verifiedRes = await post('/update-status', {
       id: item.id,
       status: 'verified',
     }, ctx.developerToken);
 
+    const changesRequestedRes = await post('/update-status', {
+      id: item.id,
+      status: 'changes_requested',
+    }, ctx.developerToken);
+
+    expect(verifiedRes.status).toBe(400);
+    expect(changesRequestedRes.status).toBe(400);
+  });
+
+  it('POST /update-status — rejects statuses with dedicated endpoints', async () => {
+    const item = await createTestItem();
+    await post('/claim', { id: item.id }, ctx.developerToken);
+    await resolveTestItem(item.id);
+
+    for (const status of ['new', 'done', 'cancelled']) {
+      const res = await post('/update-status', { id: item.id, status }, ctx.developerToken);
+      expect(res.status).toBe(400);
+    }
+
+    const unchanged = ctx.db.select().from(scoutItems).where(eq(scoutItems.id, item.id)).get();
+    expect(unchanged?.status).toBe('done');
+    expect(unchanged?.resolvedAt).toBeTruthy();
+    expect(unchanged?.resolvedById).toBe(ctx.developerId);
+  });
+
+  it('POST /update-status — rejects new → in_progress without claim', async () => {
+    const item = await createTestItem();
+
+    const res = await post('/update-status', {
+      id: item.id,
+      status: 'in_progress',
+    }, ctx.developerToken);
+
     expect(res.status).toBe(400);
+
+    const unchanged = ctx.db.select().from(scoutItems).where(eq(scoutItems.id, item.id)).get();
+    expect(unchanged?.status).toBe('new');
+    expect(unchanged?.assigneeId).toBeNull();
   });
 
   it('POST /update-status — review requires evidence', async () => {

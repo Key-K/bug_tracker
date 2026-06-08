@@ -43,10 +43,11 @@ function getItemPermissions(item: typeof scoutItems.$inferSelect, user: typeof u
   const canWorkflow = hasProjectPermission(user.id, user.role, item.projectId, 'workflow', apiKey);
   const canTriage = hasProjectPermission(user.id, user.role, item.projectId, 'triage', apiKey);
   const canComment = hasProjectPermission(user.id, user.role, item.projectId, 'comment', apiKey);
+  const canUseGenericStatusUpdate = ['in_progress', 'review', 'testing', 'done', 'changes_requested'].includes(item.status);
   const canCancelOwnNew = item.status === 'new' && item.reporterId === user.id && canComment;
   return {
     canClaim: !isNote && item.status === 'new' && canWorkflow,
-    canUpdateStatus: !isNote && canWorkflow,
+    canUpdateStatus: !isNote && canWorkflow && canUseGenericStatusUpdate,
     canResolve: !isNote && canWorkflow,
     canVerify: !isNote && canTriage && (item.status === 'done' || item.status === 'testing'),
     canRequestChanges: !isNote && canTriage && (item.status === 'review' || item.status === 'testing' || item.status === 'done' || item.status === 'verified'),
@@ -326,22 +327,21 @@ export const itemRoutes = new Hono()
       const { id, status, branchName, mrUrl, attemptCount, evidence } = c.req.valid('json');
       const user = c.get('user');
 
-      if (status === 'verified' || status === 'changes_requested') {
-        throw new ValidationError('Use the dedicated verification endpoints for human acceptance or requested changes', 'DEDICATED_VERIFICATION_ENDPOINT_REQUIRED');
-      }
-
       // Check project access via item's projectId
-      const existing = db.select({ projectId: scoutItems.projectId }).from(scoutItems).where(eq(scoutItems.id, id)).get();
+      const existing = db.select({ projectId: scoutItems.projectId, status: scoutItems.status }).from(scoutItems).where(eq(scoutItems.id, id)).get();
       if (!existing) throw new NotFoundError('Item', 'ITEM_NOT_FOUND');
       requireProjectPermission(user.id, user.role, existing.projectId, 'workflow', c.get('apiKey'));
 
-      const oldStatus = db.select({ status: scoutItems.status }).from(scoutItems).where(eq(scoutItems.id, id)).get()?.status ?? 'new';
+      if (existing.status === 'new' && status === 'in_progress') {
+        throw new ValidationError('Use /items/claim to start work on a new item', 'DEDICATED_CLAIM_ENDPOINT_REQUIRED');
+      }
+
       const item = updateItemStatus(id, status, user, {
         branchName, mrUrl, attemptCount, evidence,
       });
       logAudit({ userId: user.id, action: 'update_status', entityType: 'item', entityId: id, details: { status }, ipAddress: getClientIp(c) });
-      dispatchWebhooks(existing.projectId, 'item.status_changed', { item, oldStatus, newStatus: status }).catch(() => {});
-      eventBus.publish({ type: 'item.status_changed', projectId: existing.projectId, payload: { item, oldStatus, newStatus: status } });
+      dispatchWebhooks(existing.projectId, 'item.status_changed', { item, oldStatus: existing.status, newStatus: status }).catch(() => {});
+      eventBus.publish({ type: 'item.status_changed', projectId: existing.projectId, payload: { item, oldStatus: existing.status, newStatus: status } });
       return c.json({ data: item });
     })
 

@@ -205,7 +205,7 @@
   "items.detail.evidence.sources.ci": "CI",
   "items.detail.evidence.sources.deploy": "Deploy",
   "items.detail.evidence.sources.audit": "Аудит",
-  "items.detail.resolution.title": "Решение",
+  "items.detail.resolution.title": "Контекст работы",
   "items.detail.resolution.branch": "Ветка",
   "items.detail.resolution.mrUrl": "Merge Request",
   "items.detail.resolution.date": "Дата решения",

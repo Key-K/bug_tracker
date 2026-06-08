@@ -127,6 +127,7 @@ export const listUsersSchema = paginationSchema.extend({
 // === Items ===
 const itemTypeSchema = z.enum(['bug', 'note', 'task']);
 const itemStatusSchema = z.enum(ITEM_STATUSES);
+const updateItemStatusTargetSchema = z.enum(['in_progress', 'review', 'testing']);
 
 export const createItemSchema = z.object({
   projectId: uuidSchema,
@@ -179,7 +180,7 @@ export const cancelItemSchema = z.object({ id: uuidSchema });
 
 export const updateItemStatusSchema = z.object({
   id: uuidSchema,
-  status: itemStatusSchema,
+  status: updateItemStatusTargetSchema,
   branchName: z.string().max(255).optional(),
   mrUrl: z.string().url().max(500).optional(),
   attemptCount: z.number().int().min(0).optional(),

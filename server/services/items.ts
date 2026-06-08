@@ -369,6 +369,12 @@ export function updateItemStatus(
       updateData.resolvedAt = now();
     }
 
+    if (newStatus === 'new') {
+      updateData.assigneeId = null;
+      updateData.resolvedById = null;
+      updateData.resolvedAt = null;
+    }
+
     if (newStatus === 'changes_requested' || newStatus === 'in_progress') {
       updateData.resolvedById = null;
       updateData.resolvedAt = null;

@@ -3,6 +3,15 @@ import { createHash, randomUUID } from 'node:crypto';
 import { db } from '../db/client.js';
 import { errorGroupOccurrences, errorGroups, projects, scoutBridgeJobs, scoutItems, scoutItemNotes, type ErrorGroup } from '../db/schema.js';
 import { NotFoundError, ValidationError } from '../lib/errors.js';
+import { eventBus } from '../lib/event-bus.js';
+import { logAudit } from './audit.js';
+import { dispatchWebhooks } from './webhooks.js';
+
+type ItemStatusChange = {
+  item: typeof scoutItems.$inferSelect;
+  oldStatus: typeof scoutItems.$inferSelect.status;
+  errorGroupId: string;
+};
 
 type ErrorUpsertInput = {
   projectId?: string;
@@ -126,8 +135,9 @@ export function upsertErrorGroup(input: ErrorUpsertInput, resolvedProjectId?: st
   const existing = db.select().from(errorGroups)
     .where(and(eq(errorGroups.projectId, projectId), eq(errorGroups.environment, input.environment), eq(errorGroups.fingerprint, input.fingerprint)))
     .get();
+  const reopenedItemStatusChanges: ItemStatusChange[] = [];
 
-  return db.transaction((tx) => {
+  const group = db.transaction((tx) => {
     if (!existing) {
       const itemId = randomUUID();
       tx.insert(scoutItems).values({
@@ -223,10 +233,29 @@ export function upsertErrorGroup(input: ErrorUpsertInput, resolvedProjectId?: st
         type: 'status_change',
         createdAt: now(),
       }).run();
+      reopenedItemStatusChanges.push({
+        item: tx.select().from(scoutItems).where(eq(scoutItems.id, linkedItem.id)).get()!,
+        oldStatus: linkedItem.status,
+        errorGroupId: existing.id,
+      });
     }
 
     return tx.select().from(errorGroups).where(eq(errorGroups.id, existing.id)).get()!;
   });
+
+  for (const { item, oldStatus, errorGroupId } of reopenedItemStatusChanges) {
+    logAudit({
+      userId: null,
+      action: 'reopen_item',
+      entityType: 'item',
+      entityId: item.id,
+      details: { status: 'new', reason: 'regression', errorGroupId, release: input.release ?? null },
+    });
+    dispatchWebhooks(item.projectId, 'item.status_changed', { item, oldStatus, newStatus: 'new' }).catch(() => {});
+    eventBus.publish({ type: 'item.status_changed', projectId: item.projectId, payload: { item, oldStatus, newStatus: 'new' } });
+  }
+
+  return group;
 }
 
 function shouldReopenRegression(
