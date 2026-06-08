@@ -50,27 +50,25 @@ interface Counts {
   new: number;
   in_progress: number;
   review: number;
-  testing: number;
   done: number;
   changes_requested: number;
   verified: number;
   cancelled: number;
 }
 
-const STATUSES = ['all', 'new', 'in_progress', 'review', 'testing', 'done', 'changes_requested', 'verified', 'cancelled'] as const;
-const ITEM_TYPES = ['all', 'bug', 'note', 'task'] as const;
+type StatusKey = keyof Counts;
+type QueueId = 'open' | 'in_progress' | 'needs_review' | 'needs_acceptance' | 'accepted' | 'archived';
 
-const STATUS_KEYS: Record<string, string> = {
-  all: 'items.statuses.all',
-  new: 'items.statuses.new',
-  in_progress: 'items.statuses.in_progress',
-  review: 'items.statuses.review',
-  testing: 'items.statuses.testing',
-  done: 'items.statuses.done',
-  changes_requested: 'items.statuses.changes_requested',
-  verified: 'items.statuses.verified',
-  cancelled: 'items.statuses.cancelled',
-};
+const DEFAULT_QUEUE: QueueId = 'open';
+const QUEUES: Array<{ id: QueueId; labelKey: string; statuses: StatusKey[] }> = [
+  { id: 'open', labelKey: 'items.queues.open', statuses: ['new'] },
+  { id: 'in_progress', labelKey: 'items.queues.in_progress', statuses: ['in_progress'] },
+  { id: 'needs_review', labelKey: 'items.queues.needs_review', statuses: ['review', 'changes_requested'] },
+  { id: 'needs_acceptance', labelKey: 'items.queues.needs_acceptance', statuses: ['done'] },
+  { id: 'accepted', labelKey: 'items.queues.accepted', statuses: ['verified'] },
+  { id: 'archived', labelKey: 'items.queues.archived', statuses: ['cancelled'] },
+];
+const ITEM_TYPES = ['all', 'bug', 'note', 'task'] as const;
 
 const ITEM_TYPE_KEYS: Record<string, string> = {
   all: 'items.types.all',
@@ -84,9 +82,13 @@ const PRIORITIES = ['critical', 'high', 'medium', 'low'] as const;
 const FORM_CONTROL_CLASS =
   'h-9 rounded-md border border-gray-300 px-3 text-sm leading-5 shadow-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500';
 
-function getInitialStatus(params: URLSearchParams) {
-  const status = params.get('status');
-  return status && STATUSES.includes(status as (typeof STATUSES)[number]) ? status : 'all';
+function getInitialQueue(params: URLSearchParams): QueueId {
+  const queue = params.get('queue');
+  return QUEUES.some((entry) => entry.id === queue) ? queue as QueueId : DEFAULT_QUEUE;
+}
+
+function getQueue(queue: string) {
+  return QUEUES.find((entry) => entry.id === queue) ?? QUEUES[0]!;
 }
 
 function getInitialPriority(params: URLSearchParams) {
@@ -119,13 +121,12 @@ export default function Items() {
     total: 0,
     totalPages: 1,
   });
-  const [statusFilter, setStatusFilter] = useState<string>(() => getInitialStatus(searchParams));
+  const queueFilter = getInitialQueue(searchParams);
   const [itemTypeFilter, setItemTypeFilter] = useState<string>(() => getInitialItemType(searchParams));
   const [counts, setCounts] = useState<Counts>({
     new: 0,
     in_progress: 0,
     review: 0,
-    testing: 0,
     done: 0,
     changes_requested: 0,
     verified: 0,
@@ -171,7 +172,7 @@ export default function Items() {
     const next = new URLSearchParams();
     next.set('project', selectedProject);
     if (itemTypeFilter !== 'all') next.set('type', itemTypeFilter);
-    if (statusFilter !== 'all') next.set('status', statusFilter);
+    if (queueFilter !== DEFAULT_QUEUE) next.set('queue', queueFilter);
     if (pagination.page > 1) next.set('page', String(pagination.page));
     if (search) next.set('q', search);
     if (priorityFilter) next.set('priority', priorityFilter);
@@ -181,7 +182,7 @@ export default function Items() {
     if (nextString !== currentSearchParams) {
       setSearchParams(next, { replace: true });
     }
-  }, [selectedProject, itemTypeFilter, statusFilter, pagination.page, search, priorityFilter, assigneeFilter, currentSearchParams, setSearchParams]);
+  }, [selectedProject, itemTypeFilter, queueFilter, pagination.page, search, priorityFilter, assigneeFilter, currentSearchParams, setSearchParams]);
 
   // Load users for assignee filter (admin only)
   useEffect(() => {
@@ -205,9 +206,7 @@ export default function Items() {
     if (itemTypeFilter !== 'all') {
       body.itemType = itemTypeFilter;
     }
-    if (statusFilter !== 'all') {
-      body.status = statusFilter;
-    }
+    body.statuses = getQueue(queueFilter).statuses;
     if (search) {
       body.search = search;
     }
@@ -232,7 +231,7 @@ export default function Items() {
       })
       .catch(() => {})
       .finally(() => { if (showLoading) setLoading(false); });
-  }, [selectedProject, itemTypeFilter, statusFilter, pagination.page, search, assigneeFilter, priorityFilter]);
+  }, [selectedProject, itemTypeFilter, queueFilter, pagination.page, search, assigneeFilter, priorityFilter]);
 
   // Load items + counts when project or filter changes
   useEffect(() => {
@@ -251,17 +250,24 @@ export default function Items() {
     setSelectedProject(projectId);
     storeSelectedProjectId(projectId);
     setPagination((p) => ({ ...p, page: 1 }));
-    setStatusFilter('all');
     setItemTypeFilter('all');
     setSearch('');
     setSearchInput('');
     setAssigneeFilter('');
     setPriorityFilter('');
+    setSearchParams(new URLSearchParams({ project: projectId }), { replace: true });
   }
 
-  function handleStatusChange(status: string) {
-    setStatusFilter(status);
+  function handleQueueChange(queue: QueueId) {
+    if (queue === queueFilter) return;
+
+    const next = new URLSearchParams(searchParams);
+    if (selectedProject) next.set('project', selectedProject);
+    if (queue === DEFAULT_QUEUE) next.delete('queue');
+    else next.set('queue', queue);
+    next.delete('page');
     setPagination((p) => ({ ...p, page: 1 }));
+    setSearchParams(next, { replace: false });
   }
 
   function handleItemTypeFilter(e: React.ChangeEvent<HTMLSelectElement>) {
@@ -329,13 +335,11 @@ export default function Items() {
     return `/items/${itemId}`;
   }
 
-  const totalAll = Object.values(counts).reduce((sum, value) => sum + value, 0);
   const canCreateSelectedItem = selectedProject ? canCreateItems(selectedProject) : false;
 
-  function getTabCount(status: string): number | null {
-    if (status === 'all') return totalAll || null;
-    const val = counts[status as keyof Counts];
-    return val > 0 ? val : null;
+  function getTabCount(queue: QueueId): number | null {
+    const value = getQueue(queue).statuses.reduce((sum, status) => sum + counts[status], 0);
+    return value > 0 ? value : null;
   }
 
   return (
@@ -429,21 +433,21 @@ export default function Items() {
         )}
       </div>
 
-      {/* Status filter tabs — horizontal scroll on mobile */}
+      {/* Queue tabs — horizontal scroll on mobile */}
       <div className="mb-4 flex gap-1 border-b border-gray-200 overflow-x-auto">
-        {STATUSES.map((s) => {
-          const count = getTabCount(s);
+        {QUEUES.map((queue) => {
+          const count = getTabCount(queue.id);
           return (
             <button
-              key={s}
-              onClick={() => handleStatusChange(s)}
+              key={queue.id}
+              onClick={() => handleQueueChange(queue.id)}
               className={`relative shrink-0 px-3 py-2 text-sm font-medium transition-colors ${
-                statusFilter === s
+                queueFilter === queue.id
                   ? 'border-b-2 border-gray-900 text-gray-900'
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              {t(STATUS_KEYS[s]!)}
+              {t(queue.labelKey)}
               {count !== null && (
                 <span className="ml-1.5 rounded-full bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600">
                   {count}

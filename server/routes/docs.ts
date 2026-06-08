@@ -708,7 +708,6 @@ const spec = {
                             new: { type: 'integer' },
                             in_progress: { type: 'integer' },
                             review: { type: 'integer' },
-                            testing: { type: 'integer' },
                             done: { type: 'integer' },
                             changes_requested: { type: 'integer' },
                             verified: { type: 'integer' },
@@ -823,7 +822,7 @@ const spec = {
       post: {
         tags: ['Items'],
         summary: 'Обновить статус item',
-        description: 'Универсальный эндпоинт только для инженерных workflow-переходов в `in_progress`, `review` или `testing`. Используйте `/items/claim` для начала нового item, `/items/resolve` для `done`, `/items/verify` для `verified`, `/items/request-changes` для `changes_requested`, `/items/cancel` для `cancelled` и `/items/reopen` для возврата в `new`. Переход в review требует свежий structured evidence record или evidence в этом запросе. Требуется project permission `workflow` (admin/owner/manager/developer).',
+        description: 'Универсальный эндпоинт только для инженерных workflow-переходов в `in_progress` или `review`. Используйте `/items/claim` для начала нового item, `/items/resolve` для `done`, `/items/verify` для `verified`, `/items/request-changes` для `changes_requested`, `/items/cancel` для `cancelled` и `/items/reopen` для возврата в `new`. Переход в review требует свежий structured evidence record или evidence в этом запросе. Требуется project permission `workflow` (admin/owner/manager/developer).',
         security: [{ BearerAuth: [] }, { ApiKeyAuth: [] }],
         requestBody: {
           required: true,
@@ -834,7 +833,7 @@ const spec = {
                 required: ['id', 'status'],
                 properties: {
                   id: { type: 'string', format: 'uuid' },
-                  status: { type: 'string', enum: ['in_progress', 'review', 'testing'] },
+                  status: { type: 'string', enum: ['in_progress', 'review'] },
                   branchName: { type: 'string', maxLength: 255 },
                   mrUrl: { type: 'string', format: 'uri', maxLength: 500 },
                   attemptCount: { type: 'integer', minimum: 0 },
@@ -858,7 +857,7 @@ const spec = {
       post: {
         tags: ['Items'],
         summary: 'Принять item человеком',
-        description: 'Переводит item из done/testing в verified после human acceptance. Не перетирает resolvedById/resolvedAt, чтобы сохранить исполнителя done. Требуется project permission `triage` (admin/owner/manager).',
+        description: 'Переводит item из done в verified после human acceptance. Не перетирает resolvedById/resolvedAt, чтобы сохранить исполнителя done. Требуется project permission `triage` (admin/owner/manager).',
         security: [{ BearerAuth: [] }, { ApiKeyAuth: [] }],
         requestBody: {
           required: true,
@@ -890,7 +889,7 @@ const spec = {
       post: {
         tags: ['Items'],
         summary: 'Вернуть item на правки',
-        description: 'Переводит item из review/testing/done/verified в changes_requested и добавляет actionable note с expected/actual context. Требуется project permission `triage` (admin/owner/manager).',
+        description: 'Переводит item из review/done/verified в changes_requested и добавляет actionable note с expected/actual context. Требуется project permission `triage` (admin/owner/manager).',
         security: [{ BearerAuth: [] }, { ApiKeyAuth: [] }],
         requestBody: {
           required: true,

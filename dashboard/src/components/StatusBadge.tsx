@@ -4,7 +4,6 @@ const colorMap: Record<string, string> = {
   new: 'bg-yellow-100 text-yellow-800',
   in_progress: 'bg-blue-100 text-blue-800',
   review: 'bg-purple-100 text-purple-800',
-  testing: 'bg-indigo-100 text-indigo-800',
   done: 'bg-green-100 text-green-800',
   changes_requested: 'bg-red-100 text-red-800',
   verified: 'bg-emerald-100 text-emerald-800',

@@ -18,9 +18,8 @@ interface DbOrTx {
 const VALID_TRANSITIONS: Record<ItemStatus, ItemStatus[]> = {
   new: ['in_progress', 'cancelled'],
   in_progress: ['review', 'done', 'cancelled'],
-  review: ['in_progress', 'testing', 'done', 'changes_requested', 'cancelled'],
-  testing: ['in_progress', 'done', 'changes_requested', 'verified', 'cancelled'],
-  done: ['new', 'testing', 'changes_requested', 'verified'],
+  review: ['in_progress', 'done', 'changes_requested', 'cancelled'],
+  done: ['new', 'changes_requested', 'verified'],
   changes_requested: ['in_progress', 'cancelled'],
   verified: ['new', 'changes_requested'],
   cancelled: ['new'],

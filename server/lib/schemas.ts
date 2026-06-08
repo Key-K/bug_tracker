@@ -127,7 +127,7 @@ export const listUsersSchema = paginationSchema.extend({
 // === Items ===
 const itemTypeSchema = z.enum(['bug', 'note', 'task']);
 const itemStatusSchema = z.enum(ITEM_STATUSES);
-const updateItemStatusTargetSchema = z.enum(['in_progress', 'review', 'testing']);
+const updateItemStatusTargetSchema = z.enum(['in_progress', 'review']);
 
 export const createItemSchema = z.object({
   projectId: uuidSchema,

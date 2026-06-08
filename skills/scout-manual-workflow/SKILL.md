@@ -33,7 +33,7 @@ The slash command surface is intentionally one command: `/scout`. Optimize this 
 
 1. If the user provides a Scout item id or item URL, run single-item mode: fetch that item, inspect related items, and handle the item end-to-end. Include related items only when evidence shows the same root cause or a direct blocker.
 2. If the user asks for the next/one Scout task, run single-next mode: choose exactly one next actionable item or one evidence-backed shared-root cluster.
-3. If the user explicitly asks for all/full queue work, run full active queue mode. Continue through actionable `changes_requested`, `testing`, `review`, `in_progress`, `new`, and triage-worthy `note` items until no item can honestly move further with the available access and safety constraints.
+3. If the user explicitly asks for all/full queue work, run full active queue mode. Continue through actionable `changes_requested`, `review`, `in_progress`, `new`, and triage-worthy `note` items until no item can honestly move further with the available access and safety constraints.
 4. If the user invokes bare `/scout` with no narrowing text, run single-next mode: choose exactly one next actionable item or one evidence-backed shared-root cluster.
 5. Always build the readiness matrix internally; expose it only when it affects the final decision, a blocker, or the user's understanding.
 6. Audit `done` or `verified` items only when the user's request explicitly asks to recheck completed/accepted/closed work. Normal Scout work does not disturb `done` awaiting human acceptance or `verified` human-accepted items.
@@ -118,8 +118,8 @@ When the user asks to work from Scout:
 1. Detect whether the prompt contains a Scout item id or item URL.
 2. If an item id or URL is present, fetch that item first and run single-item mode.
 3. If no item id or URL is present, use `SCOUT_PROJECT_SLUG` or the user's project name to find the relevant project, then choose single-next by default or full active queue mode only from explicit full/all queue wording.
-4. In single-next mode, inspect enough `changes_requested`, `testing`, `review`, `in_progress`, `new`, and triage-worthy `note` items to choose the best next actionable item, then stop after that item or shared-root cluster reaches the furthest honest status.
-5. In full active queue mode, inspect `changes_requested`, `testing`, `review`, `in_progress`, `new`, and triage-worthy `note` items before choosing work. Do not stop after one item unless the remaining queue is honestly blocked, waiting on target verification, not actionable, or unsafe.
+4. In single-next mode, inspect enough `changes_requested`, `review`, `in_progress`, `new`, and triage-worthy `note` items to choose the best next actionable item, then stop after that item or shared-root cluster reaches the furthest honest status.
+5. In full active queue mode, inspect `changes_requested`, `review`, `in_progress`, `new`, and triage-worthy `note` items before choosing work. Do not stop after one item unless the remaining queue is honestly blocked, waiting on target verification, not actionable, or unsafe.
 6. For every item that may move, fetch the full item before editing code or changing status.
 7. Read the item type (`bug`, `note`, `task`), source, message, status, priority, labels, created date, URL, route, component hints, selector, element text/HTML, screenshot path, session recording path, existing notes, assignee, branch, PR link, evidence, and related items.
 8. If the item is a `note`, run `AI Note Triage Algorithm` before any code work. Do not claim a note directly.
@@ -169,7 +169,7 @@ Never use code changes as a way to guess through an unclear note. The AI agent c
 
 When selecting work from a project rather than a specific item, first inspect the queue like a bug triage owner, not like a FIFO script.
 
-1. List open items across relevant statuses: `changes_requested`, `testing`, `review`, `in_progress`, and `new` when appropriate. Prefer one `/api/items/list` call with `statuses` when Scout supports it; otherwise make separate status calls. Do not filter notes out; if the combined list cannot include all item types, run an additional note-specific list call so useful notes can be converted by AI triage instead of waiting for a developer.
+1. List open items across relevant statuses: `changes_requested`, `review`, `in_progress`, and `new` when appropriate. Prefer one `/api/items/list` call with `statuses` when Scout supports it; otherwise make separate status calls. Do not filter notes out; if the combined list cannot include all item types, run an additional note-specific list call so useful notes can be converted by AI triage instead of waiting for a developer.
 2. Sort by severity and urgency first, then age:
    - `critical`: production outage, data loss/corruption, security/privacy issue, broken core workflow.
    - `high`: major user-visible failure, blocked important workflow, strong business impact.
@@ -178,19 +178,18 @@ When selecting work from a project rather than a specific item, first inspect th
 3. Within the same priority, prefer older `createdAt` items unless a newer item is clearly a regression, duplicate of a hot issue, or blocks more users.
 4. Do not starve old medium/low items forever. If many old items accumulate, call that out in Scout or in the user-facing summary.
 5. Treat assigned `in_progress` items carefully: do not take over another person's work unless the user explicitly asks or the item is clearly abandoned.
-6. Check `review` and `testing` items before starting new work when they may already contain a fix for the same area.
+6. Check `review` items before starting new work when they may already contain a fix for the same area.
 
 Recommended selection order:
 
 1. `changes_requested` items: read the rejection note, move to `in_progress` only when taking ownership, fix the exact expected/actual gap, and repeat verification.
-2. `testing` items whose target-environment verification can be completed now: finish to `done`, return failures to `in_progress`, or record exact blockers.
-3. `review` items: verify accepted target environment when available; otherwise leave with explicit blocker or keep ready for target verification.
-4. Active or abandoned `in_progress` items owned by this agent/user context: continue, fix, verify, and hand off or document blockers.
-5. Critical items, oldest first, grouped by suspected root cause.
-6. High priority regressions or blockers, oldest first.
-7. Actionable notes related to critical/high work, converted to tasks before implementation.
-8. Related clusters where one fix may resolve multiple open items.
-9. Remaining oldest actionable bugs, tasks, or convertible notes within the requested scope.
+2. `review` items: verify accepted target environment when available; otherwise leave with explicit blocker or keep ready for target verification. If target verification is active or assigned, record the owner/checks/blocker in Scout notes or evidence instead of changing status.
+3. Active or abandoned `in_progress` items owned by this agent/user context: continue, fix, verify, and hand off or document blockers.
+4. Critical items, oldest first, grouped by suspected root cause.
+5. High priority regressions or blockers, oldest first.
+6. Actionable notes related to critical/high work, converted to tasks before implementation.
+7. Related clusters where one fix may resolve multiple open items.
+8. Remaining oldest actionable bugs, tasks, or convertible notes within the requested scope.
 
 ## Related Items And Duplicate Work
 
@@ -235,7 +234,7 @@ When `/scout` runs without a specific item id or URL, optimize for correct full-
 3. For a shared-root cluster, make one cohesive code change and one verification matrix, then write item-specific evidence/notes/statuses for each covered Scout item.
 4. Avoid status noise: do not claim every candidate just because it was listed. Claim an item when implementation or active verification starts.
 5. Keep the ledger as the durable progress source for batch state. Do not paste full queue snapshots or every API response into chat or Scout notes.
-6. Continue until every active item in scope is either `done`, `review`, `testing`, `changes_requested` with an exact blocker/failure, `in_progress` with an exact blocker/failure, `cancelled`, or left as a non-actionable `note` with one focused question/blocker.
+6. Continue until every active item in scope is either `done`, `review`, `changes_requested` with an exact blocker/failure, `in_progress` with an exact blocker/failure, `cancelled`, or left as a non-actionable `note` with one focused question/blocker.
 
 ## Triage
 
@@ -424,10 +423,10 @@ When `/scout` handles many items, keep local work atomic but do not stop at loca
 
 1. Process one item or one evidence-backed shared-root cluster at a time: claim only active items, diagnose, fix, verify locally, commit with Scout reference, and add Russian notes/evidence for each covered item.
 2. After a completed item, shared-root cluster, or small safe batch, push and deploy to staging when the canonical staging path exists and batching does not hide item-specific acceptance. Avoid one deploy per trivial item only when a short batch reduces churn without delaying critical work.
-3. Maintain clear verification queues: every item in `review` must have a commit/branch/PR reference, local verification evidence, and a Russian handoff or staging blocker note; every item in `testing` must have active target-environment verification underway or a recorded blocker.
+3. Maintain a clear `review` queue: every item in `review` must have a commit/branch/PR reference, local verification evidence, and a Russian handoff or staging blocker note. Active target-environment verification belongs in notes/evidence/assignee, not in a separate status.
 4. If several items share one root cause, one cohesive commit may reference multiple Scout items. Add notes to each covered item and verify each item's acceptance condition locally and, when possible, on staging.
 5. If a later local item reveals a regression in an earlier reviewed item before staging acceptance, move the earlier item back to `in_progress`, explain why in Scout, and update the fix before deploy.
-6. After a staging deploy, verify the `review` and `testing` items linked to the deployed branch/commit/PR, then move only individually passing items to `done`.
+6. After a staging deploy, verify the `review` items linked to the deployed branch/commit/PR, then move only individually passing items to `done`.
 7. Different cases may need different checks. Choose item-specific staging verification from the item's evidence and changed surface instead of forcing one universal checklist.
 8. Do not claim every queued item at batch start. Claim an item only when implementation or active verification for that item or shared-root cluster starts.
 9. Before a batch status update, prepare a readiness matrix and update only rows whose individual evidence satisfies the status gate.
@@ -442,7 +441,7 @@ Before any push, deploy, or target-environment verification, discover the one ca
 3. Treat staging and production as separate targets. If the repo exposes only a production deploy path, do not use it as the default staging path; require an explicit user request plus repo-policy approval.
 4. For GitHub Actions deploys, use `gh` to inspect workflow definitions, dispatch or monitor the documented workflow, and wait for the relevant run/check conclusion before claiming deploy success.
 5. Do not SSH, run server-side builds, restart services, or choose a manual docker/pm2/systemctl fallback unless repo docs explicitly say that is canonical or the user approves that fallback for the incident.
-6. If the canonical staging path is missing, ambiguous, unavailable, or fails, stop deploy work, record the blocker in Scout, and leave items in `review`, `testing`, or `in_progress` according to the status rules.
+6. If the canonical staging path is missing, ambiguous, unavailable, or fails, stop deploy work, record the blocker in Scout, and leave items in `review` or `in_progress` according to the status rules.
 
 ## Deploy And Staging Verification
 
@@ -450,16 +449,16 @@ When completed work has a commit and the repository provides a canonical non-pro
 
 1. Deploy only through the repository's canonical staging deploy path and wait for deploy health checks to pass. If the canonical path fails, stop and report the failed run, command, or check; do not invent a manual fallback unless the user explicitly approves it for that incident.
 2. For long image build/push/cache-export phases, wait for the deploy process exit notification or its explicit timeout. Do not interrupt solely because output stalls; if the agent cancels the process, record it as operator cancellation, not as an external deploy blocker, and retry or verify before changing Scout status.
-3. Discover the `review` and `testing` items linked to the deployed branch/commit/PR. If the user says "all review tasks", inspect all `review` and `testing` items for the relevant Scout project.
+3. Discover the `review` items linked to the deployed branch/commit/PR. If the user says "all review tasks", inspect all `review` items for the relevant Scout project.
 4. For each verification item, fetch the full item, notes, evidence, commit/branch/PR fields, related items, and acceptance hints before testing.
 5. Verify on staging, not local: use the deployed staging URL, staging API, browser checks for user-visible work, and targeted API/runtime checks for backend work. For user-visible work, the staging browser check must cover the acceptance path from User Journey Verification; API/curl evidence is support only.
 6. Keep checks item-specific. Do not replace targeted staging verification with a noisy full sweep unless the item itself requires broad coverage.
 7. If staging verification passes, add structured staging evidence and a Russian staging note with environment, URL, commit/deploy SHA, exact checks, and result; then move the item to `done`.
-8. If target verification starts but will continue beyond the current atomic check, move `review` -> `testing` and record what is being tested, by whom, and what evidence is still needed.
+8. If target verification starts but will continue beyond the current atomic check, keep the item in `review` and record what is being checked, by whom, and what evidence is still needed.
 9. If staging verification fails, add a Russian failure note with repro steps, expected/actual behavior, console/network/API evidence, and suspected cause; move the item back to `in_progress` and fix it end-to-end.
 10. After fixing a staging failure, repeat the normal lifecycle: local verification, commit referencing the same Scout item, Scout note, push, staging deploy, staging verification, then `done` only after staging passes.
-11. If verification is blocked by access, missing data, unsafe destructive action, or ambiguous expected behavior, leave the item in `review`, `testing`, or `in_progress` according to reality and record the exact blocker in Scout.
-12. Do not mark unrelated review/testing items as `done` just because the deploy succeeded.
+11. If verification is blocked by access, missing data, unsafe destructive action, or ambiguous expected behavior, leave the item in `review` or `in_progress` according to reality and record the exact blocker in Scout.
+12. Do not mark unrelated review items as `done` just because the deploy succeeded.
 
 ## Communication In Scout
 
@@ -481,7 +480,7 @@ Default note structure:
 
 1. Итог: what changed or what is blocked.
 2. Проверка: the strongest fresh evidence, not every command.
-3. Статус/следующий шаг: `in_progress`, `review`, `testing`, `done`, `changes_requested`, exact blocker, commit/PR, or next action.
+3. Статус/следующий шаг: `in_progress`, `review`, `done`, `changes_requested`, exact blocker, commit/PR, or next action.
 
 Use technical terms only when they help review or reproduce the issue. Explain consequence, not line-by-line implementation. Put raw logs, long matrices, or detailed command output in an artifact or PR comment only when Scout needs that level of evidence.
 
@@ -516,7 +515,7 @@ Completion note format:
 ```text
 Итог: <что исправлено или что заблокировано>
 Проверка: <самые важные checks и результат>
-Статус: <in_progress/review/testing/done/changes_requested>, <commit/PR/branch/deploy>, <риск или "рисков не вижу">
+Статус: <in_progress/review/done/changes_requested>, <commit/PR/branch/deploy>, <риск или "рисков не вижу">
 ```
 
 ## Status Handling
@@ -527,8 +526,7 @@ Status meanings:
 
 - `new`: not owned by the agent now, or reopened for later triage.
 - `in_progress`: the agent owns the item and is actively working, investigating, fixing, or waiting on a direct blocker after taking ownership.
-- `review`: local work is complete and ready for target-environment verification, or staging could not be attempted safely yet: final local verification is fresh, a focused commit or PR reference exists, structured evidence exists, and a Russian handoff or staging blocker note exists.
-- `testing`: target-environment verification has started or is actively assigned: the item has left handoff, but acceptance has not passed yet.
+- `review`: local work is complete and needs target-environment or human review, or that review is already underway/assigned but not accepted yet: final local verification is fresh, a focused commit or PR reference exists, structured evidence exists, and a Russian handoff, active-review, or blocker note exists.
 - `done`: AI/operator work is complete and ready for human acceptance: target-environment acceptance, staging/production/deployed verification, explicit user acceptance, or another valid acceptance level exists; structured evidence exists; and a Russian completion note exists. This is not human-accepted closure.
 - `changes_requested`: a human reviewer or explicit audit rejected the current result with expected/actual context. Treat it as high-priority actionable work unless the rejection itself is unclear.
 - `verified`: human acceptance is complete. Treat it as terminal unless the user explicitly asks for an audit, a regression reopens it, or a human requests changes.
@@ -539,29 +537,27 @@ Status transition algorithm for OpenCode:
 1. `new` -> `in_progress`: If the item is actionable and the agent is starting now, call `/api/items/claim`. Add or keep a short start note. Do not claim items that are unclear, blocked before ownership, or owned by someone else unless instructed.
 2. `changes_requested` -> `in_progress`: If the returned work is actionable and the agent is taking ownership now, add a short note naming the rejection being addressed and call `/api/items/update-status` with `status:"in_progress"`. Do not use `/api/items/claim` for this status.
 3. `in_progress` -> `review`: Use only after the fix is implemented, final local checks passed, browser/runtime checks passed when relevant, final diff was reviewed, and a commit or PR reference exists, and only when staging deployment/verification cannot be completed safely in the same run. Add inline `evidence` with `result:"pass"`, an appropriate `level`, `coverage:"item"` or justified cluster coverage, and `commitSha` in `/api/items/update-status` with `status:"review"`, then add the Russian handoff or staging blocker note if not already added.
-4. `review` -> `testing`: Use when target-environment verification is starting or explicitly assigned but not finished. Add a Russian note with environment, URL/route, owner if known, checks planned or in progress, and blockers if any.
-5. `review`/`testing` -> `done`: Use only after canonical deploy or accepted target-environment verification passed. Add inline `evidence` in `/api/items/resolve` with `result:"pass"`, `level:"staging_acceptance"`, `"production_acceptance"`, `"user_acceptance"`, or explicit `"local_acceptance"`, URL when applicable, deploy/commit SHA when relevant, and the observed result. Add a Russian completion note with the target environment, remaining risks, and that human acceptance is next.
-6. `in_progress` -> `done`: Use only for non-deploy work, explicit user acceptance, or work already pushed, deployed, and verified on the target environment in the same run. The same `done` evidence requirements apply. If local-only verification is the strongest evidence, move to `review`, not `done`.
-7. `review`/`testing` -> `in_progress`: If staging/user/reviewer verification fails or the handoff/verification evidence is incomplete and the agent will fix it now, add a failure note, then call `/api/items/update-status` with `status:"in_progress"`.
-8. `done`/`verified` -> `changes_requested`: Use only in explicit audit/review mode or when a human asks to reject accepted work. Call `/api/items/request-changes` with concrete `summary`, `expected`, and `actual`; add `steps` and `url` when available. Do not use `/api/items/update-status`.
-9. `done`/`verified`/`cancelled` -> `new`/`in_progress`: Use `/api/items/reopen` only for explicit reopen/audit/regression workflows where `changes_requested` is not the right model. Pass `status:"in_progress"` only when the agent is immediately taking ownership, otherwise omit `status` to reopen as `new`.
-10. Any status -> `cancelled`: Use only when the item should not be implemented. Add a Russian note explaining duplicate/invalid/out-of-scope/not-reproducible rationale and link related items when relevant, then call `/api/items/cancel` if the API transition is valid.
+4. `review` -> `done`: Use only after canonical deploy or accepted target-environment verification passed. Add inline `evidence` in `/api/items/resolve` with `result:"pass"`, `level:"staging_acceptance"`, `"production_acceptance"`, `"user_acceptance"`, or explicit `"local_acceptance"`, URL when applicable, deploy/commit SHA when relevant, and the observed result. Add a Russian completion note with the target environment, remaining risks, and that human acceptance is next.
+5. `in_progress` -> `done`: Use only for non-deploy work, explicit user acceptance, or work already pushed, deployed, and verified on the target environment in the same run. The same `done` evidence requirements apply. If local-only verification is the strongest evidence, move to `review`, not `done`.
+6. `review` -> `in_progress`: If staging/user/reviewer verification fails or the handoff/verification evidence is incomplete and the agent will fix it now, add a failure note, then call `/api/items/update-status` with `status:"in_progress"`.
+7. `done`/`verified` -> `changes_requested`: Use only in explicit audit/review mode or when a human asks to reject accepted work. Call `/api/items/request-changes` with concrete `summary`, `expected`, and `actual`; add `steps` and `url` when available. Do not use `/api/items/update-status`.
+8. `done`/`verified`/`cancelled` -> `new`/`in_progress`: Use `/api/items/reopen` only for explicit reopen/audit/regression workflows where `changes_requested` is not the right model. Pass `status:"in_progress"` only when the agent is immediately taking ownership, otherwise omit `status` to reopen as `new`.
+9. Any status -> `cancelled`: Use only when the item should not be implemented. Add a Russian note explaining duplicate/invalid/out-of-scope/not-reproducible rationale and link related items when relevant, then call `/api/items/cancel` if the API transition is valid.
 
 Hard rules for the agent:
 
-- Never mark `review`, `testing`, or `done` because code was edited, tests passed once, or deploy succeeded by itself.
+- Never mark `review` or `done` because code was edited, tests passed once, or deploy succeeded by itself.
 - Never mark `done` from local evidence alone unless the task has no deployed/user-visible runtime or the user explicitly accepted the result.
 - Never mark `verified` as normal AI completion. Use `/api/items/verify` only after explicit human acceptance or an explicit user instruction to perform that acceptance action.
 - Do not stop at `review` solely out of habit when a safe canonical staging deploy and item-specific staging acceptance can be completed now.
 - Never move an item to `review` or `done` without structured evidence that names `result`, `level`, `coverage`, and item-specific `acceptanceScope`. Prefer passing `evidence` in the same status API call.
-- Never use `testing` as a parking status. Use it only when target-environment verification is actively underway or explicitly assigned.
 - Never create `changes_requested` through `/api/items/update-status`. Use `/api/items/request-changes` with expected/actual context when explicit review/audit rejection is allowed.
 - If a required precondition is missing, keep the item in the current honest status and add a blocker/progress note. Do not invent evidence to satisfy the gate.
 - If multiple items are covered by one fix, transition each item independently only after its own acceptance condition and evidence are satisfied.
 
 Do not add `blocked` as a Scout workflow status. In audits, `blocked` is a QA/ledger result meaning acceptance could not be safely confirmed; record the blocker in a note and keep the item in the current honest status or use `/api/items/request-changes` when explicit audit rejection is justified.
 
-When reporting broad audit counts, separate Scout workflow statuses (`new`, `in_progress`, `review`, `testing`, `done`, `changes_requested`, `verified`, `cancelled`) from QA result statuses (`pass`, `fail`, `blocked`). Do not mix these into one status list.
+When reporting broad audit counts, separate Scout workflow statuses (`new`, `in_progress`, `review`, `done`, `changes_requested`, `verified`, `cancelled`) from QA result statuses (`pass`, `fail`, `blocked`). Do not mix these into one status list.
 
 When a fix covers multiple Scout items:
 
@@ -595,7 +591,7 @@ Do not present the item as complete until all of these are true:
 5. A focused commit exists for completed code changes and references the Scout item when Scout execution mode or repo policy requires a commit; otherwise the exact reason no commit was created is recorded.
 6. Push, staging deploy, and staging acceptance were completed when they were authorized, repo-safe, and a canonical staging path existed; otherwise the exact blocker is recorded in Scout.
 7. Scout has structured evidence plus Russian notes covering start, root cause when relevant, completion or blocker, verification, commit/branch/PR/deploy references, status change, and remaining risks.
-8. The Scout status reflects reality: `changes_requested` when human/audit rejection is waiting to be addressed, `in_progress` while working or blocked on clarification, `review` only when committed and waiting on a blocked or deferred staging/target verification, `testing` only while target verification is underway, `done` only after AI/operator acceptance evidence and before human acceptance, `verified` only after human acceptance, and no silent "left for later" work.
+8. The Scout status reflects reality: `changes_requested` when human/audit rejection is waiting to be addressed, `in_progress` while working or blocked on clarification, `review` when committed work needs target/human review or that review is underway, `done` only after AI/operator acceptance evidence and before human acceptance, `verified` only after human acceptance, and no silent "left for later" work.
 9. Do not send the final user response while an authorized deploy, verification PTY, Scout status update, or queued follow-up step is still running and the next step is available. Continue until it exits and complete the remaining Scout handoff, or record a concrete blocker only when progress is technically blocked or unsafe.
 
 Final user response must be short and evidence-based:
@@ -615,7 +611,7 @@ All API calls are `POST` JSON unless retrieving storage assets. Authenticate wit
 Rules:
 
 - Current list endpoints should be normalized as `(.data.items // .items // [])` after inspecting the first response; do not assume a legacy shape.
-- Prefer one open-status list call with `statuses:["changes_requested","testing","review","in_progress","new"]`; add narrower filters or pagination only when needed.
+- Prefer one open-status list call with `statuses:["changes_requested","review","in_progress","new"]`; add narrower filters or pagination only when needed.
 - Fetch the full item with `/api/items/get` before code edits or status changes.
 - Use `/api/items/claim`, `/api/items/add-note`, `/api/items/link`, `/api/items/add-evidence`, `/api/items/update-status`, `/api/items/resolve`, `/api/items/request-changes`, and `/api/items/reopen` only when the status/evidence rules above allow that action. `/api/items/verify` is for explicit human acceptance, not normal AI completion.
 - Scout API schemas use optional string fields, not nullable string fields. Omit absent optional strings instead of sending `null`, especially refs, URL/result fields, risks, branch, PR/MR, commit and deploy fields.

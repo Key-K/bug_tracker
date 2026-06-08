@@ -43,14 +43,14 @@ function getItemPermissions(item: typeof scoutItems.$inferSelect, user: typeof u
   const canWorkflow = hasProjectPermission(user.id, user.role, item.projectId, 'workflow', apiKey);
   const canTriage = hasProjectPermission(user.id, user.role, item.projectId, 'triage', apiKey);
   const canComment = hasProjectPermission(user.id, user.role, item.projectId, 'comment', apiKey);
-  const canUseGenericStatusUpdate = ['in_progress', 'review', 'testing', 'done', 'changes_requested'].includes(item.status);
+  const canUseGenericStatusUpdate = ['in_progress', 'review', 'changes_requested'].includes(item.status);
   const canCancelOwnNew = item.status === 'new' && item.reporterId === user.id && canComment;
   return {
     canClaim: !isNote && item.status === 'new' && canWorkflow,
     canUpdateStatus: !isNote && canWorkflow && canUseGenericStatusUpdate,
     canResolve: !isNote && canWorkflow,
-    canVerify: !isNote && canTriage && (item.status === 'done' || item.status === 'testing'),
-    canRequestChanges: !isNote && canTriage && (item.status === 'review' || item.status === 'testing' || item.status === 'done' || item.status === 'verified'),
+    canVerify: !isNote && canTriage && item.status === 'done',
+    canRequestChanges: !isNote && canTriage && (item.status === 'review' || item.status === 'done' || item.status === 'verified'),
     canCancel: canTriage || canCancelOwnNew,
     canReopen: canTriage,
     canUpdate: canTriage,

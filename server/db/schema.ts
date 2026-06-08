@@ -47,7 +47,7 @@ export const pivotUsersProjects = sqliteTable('pivot_users_projects', {
   primaryKey({ columns: [table.userId, table.projectId] }),
 ]);
 
-export const ITEM_STATUSES = ['new', 'in_progress', 'review', 'testing', 'done', 'changes_requested', 'verified', 'cancelled'] as const;
+export const ITEM_STATUSES = ['new', 'in_progress', 'review', 'done', 'changes_requested', 'verified', 'cancelled'] as const;
 
 // === Scout Items ===
 export const scoutItems = sqliteTable('scout_items', {

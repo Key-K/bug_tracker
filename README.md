@@ -32,9 +32,9 @@ Tester saves note     →  Widget stores page-level observation without workflow
                                 ↓
                         AI triage converts useful notes → tasks
                                 ↓
-                        new → in_progress → review → testing → done → verified
-                                 ↑                                │
-                                 └────── changes_requested ←──────┘
+                        new → in_progress → review → done → verified
+                                 ↑                       │
+                                 └── changes_requested ←─┘
 ```
 
 ## Features
@@ -143,7 +143,7 @@ User APIs use `projectRoles` for per-project access assignment.
 
 Scout also ships an agent skill for manual bug-tracker work. It is useful when a coding agent should take a Scout item, triage related items, inspect linked runtime error context when present, reproduce the bug, fix it in a local repository, verify the result, and update Scout notes/statuses with structured evidence without relying on background automation.
 
-For OpenCode users, Scout ships a single slash command: `/scout`. The agent infers single-item, full active queue, review/testing verification, changes-requested follow-up, runtime-error follow-up, or done/verified audit mode from the argument and live queue state. The command runs the full Scout workflow through `scout-manual-workflow`.
+For OpenCode users, Scout ships a single slash command: `/scout`. The agent infers single-item, full active queue, review verification, changes-requested follow-up, runtime-error follow-up, or done/verified audit mode from the argument and live queue state. The command runs the full Scout workflow through `scout-manual-workflow`.
 
 When running OpenCode from this repository, no skill installation is required: `.opencode/opencode.json` loads the repo `skills/` directory directly.
 
@@ -189,8 +189,8 @@ Interactive docs: `https://your-scout.example/api/docs`
 | `/api/items/update-status` | Move an item through engineering workflow states with structured evidence when required |
 | `/api/items/add-evidence` | Add structured handoff, verification, audit, or blocker evidence |
 | `/api/items/resolve` | Mark implementation as `done`, ready for human acceptance |
-| `/api/items/verify` | Human acceptance: move `done`/`testing` to `verified` |
-| `/api/items/request-changes` | Human rejection: move `review`/`testing`/`done`/`verified` to `changes_requested` with expected/actual context |
+| `/api/items/verify` | Human acceptance: move `done` to `verified` |
+| `/api/items/request-changes` | Human rejection: move `review`/`done`/`verified` to `changes_requested` with expected/actual context |
 | `/api/items/reopen` | Reopen `done`/`verified`/`cancelled` items to `new` or `in_progress`; optional `reason`/`auditResult` records why |
 | `/api/items/link` | Link related/duplicate/blocking items |
 | `/api/v1/integrations/errors/upsert` | Create/update runtime error groups and link them to Scout items |
