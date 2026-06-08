@@ -7,9 +7,9 @@ description: Use when the user asks to take a bug, note, defect, improvement, or
 
 ## Role
 
-Act like a senior cross-functional owner taking full responsibility for a bug-tracker item. Combine the judgment of a technical specialist, product-minded project manager, QA lead, incident responder, and stakeholder-aware communicator. Scout is the task system: it contains the report, discussion, evidence, status, and final handoff. The local repository is where the actual engineering work happens.
+Own the Scout item lifecycle end-to-end as an AI engineering operator: understand the reported intent, diagnose the real system behavior, make the smallest complete fix, verify acceptance, update Scout with structured evidence, and leave the item in the furthest honest status. Scout holds the report, discussion, evidence, status, and handoff; the local repository holds the engineering work.
 
-This skill is an execution contract for an AI coding agent, not a human runbook. Treat every instruction as an action to perform with tools, API calls, browser checks, git commands, and Scout updates. Do not merely describe the workflow to the user when the user asked to handle a Scout item.
+This skill is an execution contract for AI agents, not a human runbook. Treat instructions as actions to perform with tools, API calls, browser checks, git commands, and Scout updates when the user asked to handle Scout work.
 
 This is not a daemon workflow. Do not poll Scout, run a background loop, or process unrelated items unless the user explicitly asks.
 
@@ -31,24 +31,22 @@ When this skill is active, OpenCode is the operator of the Scout item lifecycle.
 The slash command surface is intentionally one command: `/scout`. Optimize this workflow for AI-agent execution, not for human runbook readability.
 
 1. If the user provides a Scout item id or item URL, run single-item mode: fetch that item, inspect related items, and handle the item end-to-end. Include related items only when evidence shows the same root cause or a direct blocker.
-2. If no item id or URL is provided, run full active queue mode. Continue through all actionable `testing`, `review`, `in_progress`, `new`, and triage-worthy `note` items until no item can honestly move further with the available access and safety constraints.
-3. Full active queue mode replaces old one/all/review/readiness commands. Always build the readiness matrix internally; do not expose it unless it affects the final decision, a blocker, or the user's understanding.
-4. Audit `done` items only when the user's request explicitly asks to recheck completed/closed/done work. Normal `/scout` work does not disturb closed items.
-5. When the user's request is ambiguous, prefer full active queue mode. Ask the user only if acting could reopen done work, perform destructive actions, or choose between conflicting product outcomes.
+2. If the user asks for the next/one Scout task, run single-next mode: choose exactly one next actionable item or one evidence-backed shared-root cluster.
+3. If the user explicitly asks for all/full queue work, run full active queue mode. Continue through actionable `testing`, `review`, `in_progress`, `new`, and triage-worthy `note` items until no item can honestly move further with the available access and safety constraints.
+4. If the user invokes bare `/scout` with no narrowing text, run single-next mode: choose exactly one next actionable item or one evidence-backed shared-root cluster.
+5. Always build the readiness matrix internally; expose it only when it affects the final decision, a blocker, or the user's understanding.
+6. Audit `done` items only when the user's request explicitly asks to recheck completed/closed/done work. Normal Scout work does not disturb closed items.
+7. For ambiguous natural-language requests without an id/URL and without full-queue wording, prefer single-next mode. Ask the user only if acting could reopen done work, perform destructive actions, or choose between conflicting product outcomes.
 
 ## Professional Ownership Mode
 
-The user should not have to coach the agent through obvious professional steps. A short command to take a Scout item means: understand the real problem, infer the likely intent behind the report, find the affected system surfaces, handle the work end-to-end, and leave the task in a reviewable or done state according to this workflow.
+A short command to take Scout work means: infer the real intent from the item and evidence, find the affected surfaces, handle the work end-to-end, and leave the task in a reviewable or done state according to this workflow.
 
-Operate better than a literal ticket-taker:
-
-- Read between the lines. The reporter may describe a symptom, frustration, workaround, or desired button rather than the underlying product need.
-- Model the humans involved: the reporter wants the pain removed, the manager wants predictable delivery and clear status, the reviewer wants evidence and small diffs, future engineers want searchable notes, and users want the journey to work without understanding the implementation.
-- Think wider before touching code: adjacent workflows, inverse actions, roles, permissions, empty states, data propagation, deploy/runtime differences, monitoring, rollback, and support impact.
-- Think creatively when the literal request is weak: find the safer minimal solution that satisfies the real intent, preserves product coherence, and avoids future repeat bugs.
-- Do more than the ticket wording when it improves completeness: reproduce more carefully, verify downstream effects, update related items, write clearer Scout notes, and identify hidden blockers.
-- Do not expand product scope just to appear thorough. Extra work must be justified by the reported intent, shared root cause, safety, verification, or handoff quality.
-- Drive to closure. Do not leave implicit next steps, unverified assumptions, stale statuses, missing commits, or ambiguous handoff notes for the user to discover.
+- Treat the report as intent plus evidence, not necessarily a complete solution.
+- Check adjacent workflows, inverse actions, roles, permissions, empty states, data propagation, deploy/runtime differences, monitoring and support impact before editing.
+- Do extra work only when it is justified by shared root cause, acceptance coverage, safety, verification, or handoff quality.
+- Do not expand product scope just to appear thorough.
+- Do not leave implicit next steps, unverified assumptions, stale statuses, missing commits, or ambiguous handoff notes.
 
 ## Operating Principles
 
@@ -118,14 +116,15 @@ When the user asks to work from Scout:
 
 1. Detect whether the prompt contains a Scout item id or item URL.
 2. If an item id or URL is present, fetch that item first and run single-item mode.
-3. If no item id or URL is present, use `SCOUT_PROJECT_SLUG` or the user's project name to find the relevant project, then run full active queue mode.
-4. In full active queue mode, inspect `testing`, `review`, `in_progress`, `new`, and triage-worthy `note` items before choosing work. Do not stop after one item unless the remaining queue is honestly blocked, waiting on target verification, not actionable, or unsafe.
-5. For every item that may move, fetch the full item before editing code or changing status.
-6. Read the item type (`bug`, `note`, `task`), source, message, status, priority, labels, created date, URL, route, component hints, selector, element text/HTML, screenshot path, session recording path, existing notes, assignee, branch, PR link, evidence, and related items.
-7. If the item is a `note`, run `AI Note Triage Algorithm` before any code work. Do not claim a note directly.
-8. Decide whether the resulting item is actionable now and what the furthest honest next status can be.
-9. If actionable, leave a concise Scout note that you are taking it and what local repo/branch you will use.
-10. Claim the item or move it to `in_progress` only when you are actually starting active implementation or verification for that item or shared-root cluster.
+3. If no item id or URL is present, use `SCOUT_PROJECT_SLUG` or the user's project name to find the relevant project, then choose single-next by default or full active queue mode only from explicit full/all queue wording.
+4. In single-next mode, inspect enough `testing`, `review`, `in_progress`, `new`, and triage-worthy `note` items to choose the best next actionable item, then stop after that item or shared-root cluster reaches the furthest honest status.
+5. In full active queue mode, inspect `testing`, `review`, `in_progress`, `new`, and triage-worthy `note` items before choosing work. Do not stop after one item unless the remaining queue is honestly blocked, waiting on target verification, not actionable, or unsafe.
+6. For every item that may move, fetch the full item before editing code or changing status.
+7. Read the item type (`bug`, `note`, `task`), source, message, status, priority, labels, created date, URL, route, component hints, selector, element text/HTML, screenshot path, session recording path, existing notes, assignee, branch, PR link, evidence, and related items.
+8. If the item is a `note`, run `AI Note Triage Algorithm` before any code work. Do not claim a note directly.
+9. Decide whether the resulting item is actionable now and what the furthest honest next status can be.
+10. If actionable, leave a concise Scout note that you are taking it and what local repo/branch you will use.
+11. Claim the item or move it to `in_progress` only when you are actually starting active implementation or verification for that item or shared-root cluster.
 
 ## Scout Item Types
 
@@ -169,7 +168,7 @@ Never use code changes as a way to guess through an unclear note. The AI agent c
 
 When selecting work from a project rather than a specific item, first inspect the queue like a bug triage owner, not like a FIFO script.
 
-1. List open items across relevant statuses: `new`, `in_progress`, `review`, and `testing` when appropriate. Prefer one `/api/items/list` call with `statuses` when Scout supports it; otherwise make separate status calls. Include `itemType: note` in discovery so useful notes can be converted by AI triage instead of waiting for a developer.
+1. List open items across relevant statuses: `new`, `in_progress`, `review`, and `testing` when appropriate. Prefer one `/api/items/list` call with `statuses` when Scout supports it; otherwise make separate status calls. Do not filter notes out; if the combined list cannot include all item types, run an additional note-specific list call so useful notes can be converted by AI triage instead of waiting for a developer.
 2. Sort by severity and urgency first, then age:
    - `critical`: production outage, data loss/corruption, security/privacy issue, broken core workflow.
    - `high`: major user-visible failure, blocked important workflow, strong business impact.
@@ -295,7 +294,7 @@ For user-visible Scout items, treat the user's reported journey as the acceptanc
 
 Scout supports structured evidence records. Treat them as the handoff contract, not as optional decoration. A free-form note can explain context, but it does not replace the evidence record required for status gates.
 
-Before moving an item to `review` or `done`, create or submit evidence with:
+Before moving an item to `review` or `done`, create or submit evidence. Exact schemas live in `server/lib/schemas.ts`, status enforcement lives in `server/services/items.ts`, and live API docs are generated from `server/routes/docs.ts`; the list below is the operator checklist, not a copied schema reference:
 
 1. `environment`: local, staging, production, or another explicit runtime.
 2. `result`: `pass`, `fail`, `blocked`, or `partial`.
@@ -316,7 +315,7 @@ Rules:
 
 1. Do not move user-visible work to `review` or `done` with only `200 OK`, route-smoke, old notes, or code reasoning.
 2. For mutation workflows, evidence must include the action and post-condition: UI state, list/detail/read path, network/API response, and DB/read-model/audit trail where relevant.
-3. For `review`, evidence must be `result:"pass"` and include a real `commitSha` or real `mrUrl`; never enter placeholder refs in Scout evidence or status fields. Otherwise keep the item in `in_progress` with a blocker/progress note.
+3. For `review`, the transition payload must include `result:"pass"` evidence plus either `evidence.commitSha` or a top-level real `mrUrl`; never enter placeholder refs in Scout evidence or status fields. Otherwise keep the item in `in_progress` with a blocker/progress note.
 4. For `done`, evidence must be `result:"pass"` with target acceptance: `local_acceptance` only when the item/project/user explicitly accepts local as the target, otherwise `staging_acceptance`, `production_acceptance`, or `user_acceptance`.
 5. Generic route sweeps, cluster checks, and API smoke can support a transition, but cannot replace item-specific acceptance unless `coverage:"shared_root_cluster"` names exactly how this item is covered.
 6. For shared-root evidence, do not close a related item as `done` unless that item's original acceptance path or a documented equivalent was replayed. A root-cause/API check without the related user journey is at most `review` with explicit `uncheckedRisks`.
@@ -374,7 +373,7 @@ For batch work, audits, broad sweeps, or any run that must survive session compa
 3. Store item ids, statuses, decisions, evidence summaries, commit/deploy refs, and next actions. Do not store secrets, cookies, full tokens, raw private payloads, or huge logs.
 4. Update the ledger after each item or small batch, before moving on to unrelated work.
 5. Ledger rows are operational artifacts, not source edits. Use a safe JSON encoder and append outside the repo; avoid spending time forcing ledger updates through code-edit workflows.
-6. If a PTY session, deploy log, browser sweep, or long command produced evidence, capture the command, exit status, and relevant result summary in Scout/ledger/final notes before cleaning up the session or deleting logs.
+6. If a PTY session, deploy log, browser sweep, or long command produced evidence, capture the command, exit status, and relevant result summary in Scout notes, the ledger, or the final report before cleaning up the session or deleting logs.
 
 ## Implementation
 
@@ -390,7 +389,7 @@ For batch work, audits, broad sweeps, or any run that must survive session compa
 
 ## Commit And Handoff
 
-For completed code changes from a Scout item, create a focused git commit after final verification unless the user explicitly says not to commit or the repository policy forbids commits. After the commit, prefer to push the relevant non-production-safe branch, deploy to staging through the repository's canonical path, and verify on staging when access and safety conditions allow. Invoking `/scout` counts as permission to create focused commits, push committed work, run canonical non-production staging deploys, and perform staging verification required for Scout handoff; it does not count as permission to force-push, push protected production branches, deploy production, bypass CI/approval gates, or include unrelated changes.
+For completed code changes from Scout execution mode, create a focused git commit after final verification unless the user explicitly says not to commit or the repository policy forbids commits. Invoking `/scout` or asking to handle Scout work counts as permission to create focused commits, push committed work, run canonical non-production staging deploys, and perform staging verification required for Scout handoff only when the repo workflow allows those steps and the target is non-production-safe. Repo-local branch/deploy policy wins: production, protected/default branch pushes, release branch fast-forwards, force-pushes, CI/approval bypasses, and production deploys still require explicit user intent or approval.
 
 1. Commit only the files that belong to the Scout item. Do not include unrelated local changes, generated secrets, local env files, private runbooks, or incidental reports.
 2. Keep the commit message in the repository's required language.
@@ -403,9 +402,9 @@ For completed code changes from a Scout item, create a focused git commit after 
 Default completion flow with staging preference:
 
 1. Run the repo-required local checks and the narrowest relevant runtime/browser checks.
-2. Commit the fix with a Scout item reference.
-3. Push the committed branch when repo workflow and branch safety allow it.
-4. Discover and run the canonical staging deploy when a safe staging path exists and the required access is available.
+2. Commit the fix with a Scout item reference when Scout execution mode or repo policy requires a commit.
+3. Push the committed branch when push is authorized, repo workflow allows it, and branch safety is clear.
+4. Discover and run the canonical staging deploy when deploy is authorized, a safe staging path exists, and the required access is available.
 5. Verify the item-specific acceptance path on staging. For user-visible work, use browser evidence for the reported journey; API or health checks are supporting evidence only.
 6. If staging acceptance passes, add structured staging evidence, write a Russian completion note with commit/deploy reference, and move the item to `done`.
 7. If staging is not relevant, cannot be attempted, or cannot be completed safely, add structured evidence, write a Russian handoff/blocker note, and move the item only to the status supported by the exact evidence and blocker. Local-only `done` is allowed only for non-deploy work, explicit user acceptance, or another status-rule exception.
@@ -445,7 +444,7 @@ Before any push, deploy, or target-environment verification, discover the one ca
 
 ## Deploy And Staging Verification
 
-When completed work has a commit and the repository provides a canonical non-production staging path, `/scout` should push, deploy to staging, and verify there without waiting for a separate user prompt. Production deploys still require explicit user intent and repo-policy approval.
+When completed work has a commit and the repository provides a canonical non-production staging path, `/scout` should push, deploy to staging, and verify there without waiting for a separate user prompt, subject to repo-local branch safety rules. Production deploys, protected/default branch pushes, and release branch fast-forwards still require explicit user intent and repo-policy approval.
 
 1. Deploy only through the repository's canonical staging deploy path and wait for deploy health checks to pass. If the canonical path fails, stop and report the failed run, command, or check; do not invent a manual fallback unless the user explicitly approves it for that incident.
 2. For long image build/push/cache-export phases, wait for the deploy process exit notification or its explicit timeout. Do not interrupt solely because output stalls; if the agent cancels the process, record it as operator cancellation, not as an external deploy blocker, and retry or verify before changing Scout status.
@@ -585,8 +584,8 @@ Do not present the item as complete until all of these are true:
 2. The final diff was reviewed for unrelated changes, secrets, debug code, broad rewrites, and stale TODOs.
 3. Fresh verification evidence exists after the final edit: commands, browser checks, API checks, or a documented reason why a check cannot run.
 4. Frontend, dashboard, widget, or other user-visible changes have browser verification of the reported user journey or acceptance path when feasible; API/curl-only evidence is insufficient for UI bugs.
-5. A focused commit exists for completed code changes and references the Scout item, unless explicitly skipped with a documented reason.
-6. Push, staging deploy, and staging acceptance were completed when a safe canonical staging path existed; otherwise the exact blocker is recorded in Scout.
+5. A focused commit exists for completed code changes and references the Scout item when Scout execution mode or repo policy requires a commit; otherwise the exact reason no commit was created is recorded.
+6. Push, staging deploy, and staging acceptance were completed when they were authorized, repo-safe, and a canonical staging path existed; otherwise the exact blocker is recorded in Scout.
 7. Scout has structured evidence plus Russian notes covering start, root cause when relevant, completion or blocker, verification, commit/branch/PR/deploy references, status change, and remaining risks.
 8. The Scout status reflects reality: `in_progress` while working or blocked on clarification, `review` only when committed and waiting on a blocked or deferred staging/target verification, `testing` only while target verification is underway, `done` only after acceptance or documented staging pass, and no silent "left for later" work.
 9. Do not send the final user response while an authorized deploy, verification PTY, Scout status update, or queued follow-up step is still running and the next step is available. Continue until it exits and complete the remaining Scout handoff, or record a concrete blocker only when progress is technically blocked or unsafe.
@@ -601,200 +600,21 @@ Final user response must be short and evidence-based:
 - Push, deploy, and staging verification performed, or exact reason each was not possible.
 - Anything not completed, with the exact blocker. If nothing remains, say so explicitly.
 
-## Scout API Reference
+## Scout API Use Patterns
 
-All API calls are `POST` JSON unless retrieving storage assets. Authenticate with `Authorization: Bearer $SCOUT_API_KEY`.
+All API calls are `POST` JSON unless retrieving storage assets. Authenticate with `Authorization: Bearer $SCOUT_API_KEY`. Use the `Configuration` prefix above only inside the command process. Before adding or relying on endpoint fields beyond this section, inspect current live docs plus `server/routes/docs.ts`, `server/lib/schemas.ts`, and `server/services/items.ts`; do not turn this skill into a copied API reference.
 
-Current list endpoints return arrays under `data.items`, including `/api/projects/list` and `/api/items/list`. When operating against an older or unknown Scout server, inspect the first response once and normalize arrays with `(.data.items // .items // [])` instead of hardcoding an unverified response shape.
+Rules:
 
-Scout API schemas use optional string fields, not nullable string fields. When building JSON payloads, omit absent optional strings instead of sending `null`, especially `role`, `url`, `consoleResult`, `networkResult`, `apiResult`, `dbResult`, `fixture`, `cleanupResult`, `commitSha`, `deploySha`, `risks`, `uncheckedRisks`, `branchName`, and `mrUrl`. Use `jq -n` with only populated `--arg` values or delete empty/null fields before sending.
-
-List projects:
-
-```bash
-set -a
-[ ! -f ./.env ] || . ./.env
-set +a
-curl -fsS "$SCOUT_URL/api/projects/list" \
-  -H "Authorization: Bearer $SCOUT_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"page":1,"perPage":100}' \
-  | jq 'if type=="string" then fromjson else . end | {items:(.data.items // .items // []), pagination:(.data.pagination // .pagination // null)}'
-```
-
-Resolve the current project id by slug without assuming a legacy response shape:
-
-```bash
-PROJECT_ID=$(curl -fsS "$SCOUT_URL/api/projects/list" \
-  -H "Authorization: Bearer $SCOUT_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"page":1,"perPage":100}' \
-  | jq -r --arg slug "$SCOUT_PROJECT_SLUG" 'if type=="string" then fromjson else . end | (.data.items // .items // [])[] | select(.slug == $slug) | .id')
-test -n "$PROJECT_ID"
-```
-
-List items for a project:
-
-```bash
-set -a
-[ ! -f ./.env ] || . ./.env
-set +a
-curl -fsS "$SCOUT_URL/api/items/list" \
-  -H "Authorization: Bearer $SCOUT_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d "{\"projectId\":\"$PROJECT_ID\",\"status\":\"new\",\"page\":1,\"perPage\":100}"
-```
-
-When triaging a queue, prefer one open-status call if available:
-
-```bash
-set -a
-[ ! -f ./.env ] || . ./.env
-set +a
-curl -fsS "$SCOUT_URL/api/items/list" \
-  -H "Authorization: Bearer $SCOUT_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d "{\"projectId\":\"$PROJECT_ID\",\"statuses\":[\"new\",\"in_progress\",\"review\",\"testing\"],\"page\":1,\"perPage\":100}"
-```
-
-Use additional list calls only when you need pagination beyond the first page, a narrower search, or compatibility with an older Scout server. Use `priority` or `search` filters when narrowing a large queue.
-
-Get one item:
-
-```bash
-set -a
-[ ! -f ./.env ] || . ./.env
-set +a
-curl -fsS "$SCOUT_URL/api/items/get" \
-  -H "Authorization: Bearer $SCOUT_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"id":"<CHANGE-ME-item-id>"}'
-```
-
-Claim item:
-
-```bash
-set -a
-[ ! -f ./.env ] || . ./.env
-set +a
-curl -fsS "$SCOUT_URL/api/items/claim" \
-  -H "Authorization: Bearer $SCOUT_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"id":"<CHANGE-ME-item-id>"}'
-```
-
-Add note:
-
-```bash
-set -a
-[ ! -f ./.env ] || . ./.env
-set +a
-curl -fsS "$SCOUT_URL/api/items/add-note" \
-  -H "Authorization: Bearer $SCOUT_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"itemId":"<CHANGE-ME-item-id>","content":"<CHANGE-ME-note>"}'
-```
-
-Add structured evidence before a status change:
-
-```bash
-set -a
-[ ! -f ./.env ] || . ./.env
-set +a
-jq -n \
-  --arg itemId "<CHANGE-ME-item-id>" \
-  --arg environment "staging" \
-  --arg role "admin" \
-  --arg url "<CHANGE-ME-checked-url>" \
-  --arg scenario "<CHANGE-ME-acceptance-scenario>" \
-  --arg action "<CHANGE-ME-action-performed>" \
-  --arg visibleResult "<CHANGE-ME-observed-result>" \
-  --arg acceptanceScope "<CHANGE-ME-item-specific-acceptance>" \
-  --arg consoleResult "<CHANGE-ME-console-result>" \
-  --arg networkResult "<CHANGE-ME-network-result>" \
-  '{itemId:$itemId,kind:"handoff",result:"pass",level:"staging_acceptance",coverage:"item",environment:$environment,role:$role,url:$url,scenario:$scenario,action:$action,visibleResult:$visibleResult,acceptanceScope:$acceptanceScope,consoleResult:$consoleResult,networkResult:$networkResult,source:"agent",verifiedAt:now|todateiso8601}' \
-| curl -fsS "$SCOUT_URL/api/items/add-evidence" \
-  -H "Authorization: Bearer $SCOUT_API_KEY" \
-  -H "Content-Type: application/json" \
-  --data-binary @-
-```
-
-Link related items:
-
-```bash
-set -a
-[ ! -f ./.env ] || . ./.env
-set +a
-curl -fsS "$SCOUT_URL/api/items/link" \
-  -H "Authorization: Bearer $SCOUT_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"sourceItemId":"<CHANGE-ME-item-id>","targetItemId":"<CHANGE-ME-related-item-id>","type":"related"}'
-```
-
-Update status after a local commit without PR/MR:
-
-```bash
-set -a
-[ ! -f ./.env ] || . ./.env
-set +a
-jq -n \
-  --arg id "<CHANGE-ME-item-id>" \
-  --arg branchName "<CHANGE-ME-branch>" \
-  --arg environment "local" \
-  --arg scenario "<CHANGE-ME-scenario>" \
-  --arg action "<CHANGE-ME-action>" \
-  --arg visibleResult "<CHANGE-ME-result>" \
-  --arg acceptanceScope "<CHANGE-ME-item-specific-acceptance>" \
-  --arg consoleResult "<CHANGE-ME-console>" \
-  --arg networkResult "<CHANGE-ME-network>" \
-  --arg commitSha "<CHANGE-ME-commit>" \
-  '{id:$id,status:"review",branchName:$branchName,evidence:{kind:"handoff",result:"pass",level:"browser_acceptance",coverage:"item",environment:$environment,scenario:$scenario,action:$action,visibleResult:$visibleResult,acceptanceScope:$acceptanceScope,consoleResult:$consoleResult,networkResult:$networkResult,commitSha:$commitSha,source:"agent",verifiedAt:now|todateiso8601}}' \
-| curl -fsS "$SCOUT_URL/api/items/update-status" \
-  -H "Authorization: Bearer $SCOUT_API_KEY" \
-  -H "Content-Type: application/json" \
-  --data-binary @-
-```
-
-If a PR/MR exists, include `mrUrl` only as the real PR/MR URL, not as a commit label or plain SHA.
-
-Resolve an item to `done` after target-environment acceptance:
-
-```bash
-set -a
-[ ! -f ./.env ] || . ./.env
-set +a
-jq -n \
-  --arg id "<CHANGE-ME-item-id>" \
-  --arg resolutionNote "<CHANGE-ME-russian-completion-note>" \
-  --arg environment "staging" \
-  --arg role "<CHANGE-ME-role>" \
-  --arg url "<CHANGE-ME-checked-url>" \
-  --arg scenario "<CHANGE-ME-acceptance-scenario>" \
-  --arg action "<CHANGE-ME-action-performed>" \
-  --arg visibleResult "<CHANGE-ME-observed-result>" \
-  --arg acceptanceScope "<CHANGE-ME-item-specific-acceptance>" \
-  --arg consoleResult "<CHANGE-ME-console-result>" \
-  --arg networkResult "<CHANGE-ME-network-result>" \
-  --arg commitSha "<CHANGE-ME-commit>" \
-  --arg deploySha "<CHANGE-ME-deploy>" \
-  '{id:$id,resolutionNote:$resolutionNote,evidence:{kind:"verification",result:"pass",level:"staging_acceptance",coverage:"item",environment:$environment,role:$role,url:$url,scenario:$scenario,action:$action,visibleResult:$visibleResult,acceptanceScope:$acceptanceScope,consoleResult:$consoleResult,networkResult:$networkResult,commitSha:$commitSha,deploySha:$deploySha,source:"agent",verifiedAt:now|todateiso8601}}' \
-| curl -fsS "$SCOUT_URL/api/items/resolve" \
-  -H "Authorization: Bearer $SCOUT_API_KEY" \
-  -H "Content-Type: application/json" \
-  --data-binary @-
-```
-
-Reopen a `done` or `cancelled` item after failed audit/verification:
-
-```bash
-set -a
-[ ! -f ./.env ] || . ./.env
-set +a
-curl -fsS "$SCOUT_URL/api/items/reopen" \
-  -H "Authorization: Bearer $SCOUT_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"id":"<CHANGE-ME-item-id>","status":"in_progress"}'
-```
+- Current list endpoints should be normalized as `(.data.items // .items // [])` after inspecting the first response; do not assume a legacy shape.
+- Prefer one open-status list call with `statuses:["new","in_progress","review","testing"]`; add narrower filters or pagination only when needed.
+- Fetch the full item with `/api/items/get` before code edits or status changes.
+- Use `/api/items/claim`, `/api/items/add-note`, `/api/items/link`, `/api/items/add-evidence`, `/api/items/update-status`, `/api/items/resolve`, and `/api/items/reopen` only when the status/evidence rules above allow that action.
+- Scout API schemas use optional string fields, not nullable string fields. Omit absent optional strings instead of sending `null`, especially refs, URL/result fields, risks, branch, PR/MR, commit and deploy fields.
+- Prefer one atomic `/api/items/update-status` or `/api/items/resolve` call with an `evidence` object when moving to `review` or `done`. Use `/api/items/add-evidence` first only when the evidence must exist independently before transition.
+- For `/api/items/resolve`, use evidence `kind:"verification"` unless current API docs say otherwise.
+- Include `mrUrl` only as a real PR/MR URL. Put local commit SHAs in Scout notes/evidence, not in `mrUrl`.
+- Build payloads with `jq -n`, delete empty/null fields before sending, and keep secrets/cookies/raw private payloads out of notes and evidence.
 
 ## Boundaries
 
