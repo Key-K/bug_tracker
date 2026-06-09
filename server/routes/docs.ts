@@ -9,7 +9,7 @@ const spec = {
     title: 'Scout Bug Tracking API',
     version: '1.0.0',
     description:
-      'Scout — self-hosted bug tracker for AI-assisted product teams. Все API-эндпоинты используют метод POST с JSON-телом (кроме health, events, docs). Авторизация через Bearer JWT или API Key (`sk_live_...`). Agent convenience aliases: `/items/list` and `/items/count` accept `projectSlug` instead of `projectId`, `/items/list` accepts `limit` as a `perPage` alias, and item endpoints accept `itemId` as an alias for `id` where the body otherwise uses `id`.',
+      'Scout — self-hosted bug tracker for AI-assisted product teams. Agent workflows are expected to drive actionable work to the furthest honest status with structured evidence, asking only for hard gates such as missing access, production release, destructive action, external communication, live-money/provider action, secrets exposure, or human acceptance. Все API-эндпоинты используют метод POST с JSON-телом (кроме health, events, docs). Авторизация через Bearer JWT или API Key (`sk_live_...`). Agent convenience aliases: `/items/list` and `/items/count` accept `projectSlug` instead of `projectId`, `/items/list` accepts `limit` as a `perPage` alias, and item endpoints accept `itemId` as an alias for `id` where the body otherwise uses `id`.',
     contact: { url: 'https://your-scout.example' },
   },
   servers: [
@@ -762,7 +762,7 @@ const spec = {
       post: {
         tags: ['Items'],
         summary: 'Подготовить item к human acceptance (resolve)',
-        description: 'Переводит item в статус done: implementation/evidence complete, waiting for human acceptance. Для done/review требуется свежий structured evidence record или evidence в этом запросе. Agent automation should include result, level, coverage, environment, scenario, action, visibleResult, and item-specific acceptanceScope. Требуется project permission `workflow` (admin/owner/manager/developer).',
+        description: 'Переводит item в статус done: implementation/evidence complete, waiting for human acceptance. Для done/review требуется свежий structured evidence record или evidence в этом запросе. Agent automation should complete all safe implementation, verification, commit, push, and staging work it can before resolve, and include result, level, coverage, environment, scenario, action, visibleResult, and item-specific acceptanceScope. Требуется project permission `workflow` (admin/owner/manager/developer).',
         security: [{ BearerAuth: [] }],
         requestBody: {
           required: true,

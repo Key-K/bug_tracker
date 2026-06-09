@@ -44,7 +44,7 @@ Tester saves note     →  Widget stores page-level observation without workflow
 | **Widget** | Bug-first reporting, optional non-bug notes, Shadow DOM isolation, element picker with instruction banner, html2canvas-pro screenshot with element highlight, rrweb session recording (60s buffer), cross-domain SSO |
 | **Dashboard** | React SPA, bug/note/task items, runtime error groups, manual creation, note-to-task triage, rrweb session player, items/projects/users/webhooks management, locale switcher |
 | **i18n** | Russian, English, Uzbek (Latin). Dashboard + widget. Server error codes translated on client |
-| **Agent workflows** | Manual agent skill for controlled bug/task work, including AI triage that converts actionable notes into tasks and runtime error context handling without background automation |
+| **Agent workflows** | Manual agent skill for autonomous bug/task work, including AI triage that converts actionable notes into tasks, runtime error context handling, evidence-backed status updates, and safe non-production push/staging completion without background automation |
 | **Auth** | JWT + API keys (`sk_live_*`), system roles (admin/member), project roles (owner/manager/developer/reporter/viewer), cross-domain SSO |
 | **Infra** | Single process (API + SPA + widget on one port), SQLite, Docker, publishable GHCR image |
 
@@ -141,11 +141,11 @@ User APIs use `projectRoles` for per-project access assignment.
 
 ## Agent Skill
 
-Scout also ships an agent skill for manual bug-tracker work. It is useful when a coding agent should take a Scout item, triage related items, inspect linked runtime error context when present, reproduce the bug, fix it in a local repository, verify the result, and update Scout notes/statuses with structured evidence without relying on background automation.
+Scout also ships an agent skill for manual bug-tracker work. It is useful when a coding agent should take Scout work, triage related items, inspect linked runtime error context when present, reproduce bugs, fix them in a local repository, verify results, commit and push safe non-production branches when repo policy allows, run staging verification when a canonical path exists, and update Scout notes/statuses with structured evidence without relying on background automation.
 
-When operating from this skill, the agent should always lead the project like a responsible maintainer: make professionally justified broad changes when needed, while preserving hard gates for production releases, external communications, destructive user-data actions, secrets exposure, and human acceptance. Arguments after `/scout` choose the work scope, not a weaker behavior profile.
+When operating from this skill, the agent should always lead the project like a responsible maintainer and default to completing all solvable work itself. It should not ask for routine choices about prioritization, verification, push, staging deploy, or Scout handoff. Hard gates remain for production releases, external communications, destructive user-data actions, secrets exposure, live-money/provider actions, and human acceptance. Arguments after `/scout` choose the work scope, not a weaker behavior profile.
 
-For OpenCode users, Scout ships a single slash command: `/scout`. The agent infers single-item, single-next, full active queue, needs-review follow-up, changes-requested follow-up, runtime-error follow-up, or done/verified audit scope from the argument and live queue state. The command runs the full Scout workflow through `scout-manual-workflow`.
+For OpenCode users, Scout ships a single slash command: `/scout`. With no arguments it defaults to full active queue scope and drives every actionable item as far as it can honestly go with the available access and safety constraints. Arguments can narrow the scope to a single item, single-next work, needs-review follow-up, changes-requested follow-up, runtime-error follow-up, or done/verified audit scope. The command runs the full Scout workflow through `scout-manual-workflow`.
 
 When running OpenCode from this repository, no skill installation is required: `.opencode/opencode.json` loads the repo `skills/` directory directly.
 
