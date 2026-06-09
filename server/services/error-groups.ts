@@ -88,6 +88,29 @@ function redact(value: unknown): unknown {
   return result;
 }
 
+function buildGrafanaExploreUrl(generatorUrl: unknown): string | undefined {
+  if (typeof generatorUrl !== 'string' || generatorUrl.trim() === '') return undefined;
+  const grafanaBase = process.env.SCOUT_GRAFANA_URL?.trim() || process.env.GRAFANA_PUBLIC_URL?.trim();
+  if (!grafanaBase) return generatorUrl;
+
+  try {
+    const source = new URL(generatorUrl);
+    const expr = source.searchParams.get('g0.expr');
+    if (!expr) return generatorUrl;
+
+    const target = new URL('/explore', grafanaBase.endsWith('/') ? grafanaBase : `${grafanaBase}/`);
+    target.searchParams.set('orgId', '1');
+    target.searchParams.set('left', JSON.stringify({
+      datasource: 'Prometheus',
+      queries: [{ refId: 'A', expr }],
+      range: { from: 'now-1h', to: 'now' },
+    }));
+    return target.toString();
+  } catch {
+    return generatorUrl;
+  }
+}
+
 export function resolveErrorProjectId(input: ErrorUpsertInput): string {
   if (input.projectId) {
     const project = db.select({ id: projects.id }).from(projects).where(eq(projects.id, input.projectId)).get();
@@ -374,7 +397,7 @@ export function normalizeAlertmanagerPayload(payload: any): ErrorUpsertInput[] {
         statusClass: labels.status_class,
         severity: labels.severity === 'critical' ? 'critical' : labels.severity === 'info' ? 'info' : 'warning',
         occurredAt: alert.startsAt && !Number.isNaN(Date.parse(alert.startsAt)) ? new Date(alert.startsAt).toISOString() : now(),
-        grafanaLogsUrl: alert.generatorURL,
+        grafanaLogsUrl: buildGrafanaExploreUrl(alert.generatorURL),
         title: `[${env}][${service}] ${alertname}`,
         message: annotations.summary || annotations.description,
         release: labels.release || labels.deploy_sha || labels.deployment_sha,

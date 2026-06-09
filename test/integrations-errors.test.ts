@@ -300,6 +300,25 @@ describe('Error integrations routes', () => {
     expect(res.status).toBe(202);
   });
 
+  it('maps Alertmanager Prometheus generator URL to public Grafana Explore URL', async () => {
+    vi.stubEnv('SCOUT_ERROR_BRIDGE_SECRET', 'bridge-test-value');
+    vi.stubEnv('SCOUT_GRAFANA_URL', 'https://grafana.example.test');
+    const payload = bridgePayload('test-project', 'bridge-grafana-url');
+    payload.alerts[0]!.generatorURL = 'http://prometheus:9090/graph?g0.expr=sum+by+%28env%2C+service%29+%28rate%28gateway_requests_total%7Bstatus_class%3D%225xx%22%7D%5B5m%5D%29%29&g0.tab=1';
+
+    const res = await bridge(payload, 'bridge-test-value');
+    expect(res.status).toBe(202);
+
+    const group = ctx.db.select().from(errorGroups).get()!;
+    expect(group.grafanaLogsUrl).toContain('https://grafana.example.test/explore?');
+    expect(group.grafanaLogsUrl).not.toContain('prometheus:9090');
+    const left = JSON.parse(new URL(group.grafanaLogsUrl!).searchParams.get('left')!);
+    expect(left.queries[0].expr).toContain('gateway_requests_total');
+    const item = ctx.db.select().from(scoutItems).where(eq(scoutItems.id, group.linkedItemId!)).get()!;
+    expect(item.message).toContain('https://grafana.example.test/explore?');
+    expect(item.message).not.toContain('prometheus:9090');
+  });
+
   it('does not create active error groups from resolved bridge alerts', async () => {
     vi.stubEnv('SCOUT_ERROR_BRIDGE_SECRET', 'bridge-test-value');
     const payload = bridgePayload('test-project', 'bridge-resolved-only');
