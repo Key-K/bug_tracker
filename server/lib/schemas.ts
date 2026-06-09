@@ -326,6 +326,7 @@ export const runDailyDigestSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   dryRun: z.boolean().optional(),
   force: z.boolean().optional(),
+  recipientEmail: z.string().email().optional(),
 });
 
 // === Error integrations ===

@@ -111,6 +111,24 @@ describe('Daily email digest', () => {
     expect(deliveries.every((delivery) => delivery.digestDate === '2026-06-09')).toBe(true);
   });
 
+  it('can target one recipient for operational resends', async () => {
+    seedChangedItem();
+    const sendMail = vi.fn(async () => ({ messageId: randomUUID() }));
+
+    const result = await sendDailyDigests({
+      date: '2026-06-09',
+      recipientEmail: 'developer@test.local',
+      force: true,
+      transport: { sendMail } as any,
+    });
+
+    expect(result.recipientCount).toBe(1);
+    expect(result.sentCount).toBe(1);
+    expect(sendMail).toHaveBeenCalledTimes(1);
+    expect(sendMail.mock.calls[0][0].to).toBe('developer@test.local');
+    expect(ctx.db.select().from(emailDigestDeliveries).all()).toHaveLength(1);
+  });
+
   it('exposes admin-only dry-run endpoint', async () => {
     seedChangedItem();
     const app = new Hono();

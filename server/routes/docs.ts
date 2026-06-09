@@ -1172,6 +1172,7 @@ const spec = {
                   date: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$', description: 'Local digest date. Defaults to today in the configured digest timezone.' },
                   dryRun: { type: 'boolean', description: 'When true, returns summaries without sending email or recording delivery.' },
                   force: { type: 'boolean', description: 'When true, sends even if delivery for this user/date is already recorded.' },
+                  recipientEmail: { type: 'string', format: 'email', description: 'Optional exact recipient email filter for one-off operational sends.' },
                 },
               },
             },

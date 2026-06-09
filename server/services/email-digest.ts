@@ -57,6 +57,7 @@ type SendDailyDigestsOptions = {
   date?: string;
   dryRun?: boolean;
   force?: boolean;
+  recipientEmail?: string;
   now?: Date;
   transport?: SendMailTransport;
 };
@@ -379,7 +380,9 @@ export async function sendDailyDigests(options: SendDailyDigestsOptions = {}): P
   const timeZone = process.env.SCOUT_DAILY_DIGEST_TIMEZONE || DEFAULT_TIME_ZONE;
   const digestDate = options.date ?? getLocalDateString(options.now ?? new Date(), timeZone);
   const { periodStart, periodEnd } = getDigestPeriod(digestDate, timeZone);
-  const digests = buildDigests(digestDate, periodStart, periodEnd);
+  const recipientEmail = options.recipientEmail?.trim().toLowerCase();
+  const digests = buildDigests(digestDate, periodStart, periodEnd)
+    .filter((digest) => !recipientEmail || digest.user.email.trim().toLowerCase() === recipientEmail);
   const dryRun = options.dryRun === true;
   const transport = dryRun ? null : (options.transport ?? createTransport());
   const smtpFrom = dryRun ? 'dry-run@scout.local' : requireSmtpConfig().from;
