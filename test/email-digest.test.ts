@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { notificationRoutes } from '../server/routes/notifications.js';
-import { emailDigestDeliveries, scoutItemNotes, scoutItems } from '../server/db/schema.js';
+import { emailDigestDeliveries, scoutItemNotes, scoutItems, users } from '../server/db/schema.js';
 import { sendDailyDigests } from '../server/services/email-digest.js';
 import { createTestContext, type TestContext } from './helpers.js';
 
@@ -83,6 +83,16 @@ describe('Daily email digest', () => {
       expect(summary.statusChangeCount).toBe(2);
       expect(summary.assignmentCount).toBe(1);
     }
+  });
+
+  it('skips Scout-local placeholder email addresses', async () => {
+    ctx.db.update(users).set({ email: 'developer@scout.local' }).where(eq(users.id, ctx.developerId)).run();
+    seedChangedItem();
+
+    const result = await sendDailyDigests({ date: '2026-06-09', dryRun: true });
+
+    expect(result.recipientCount).toBe(1);
+    expect(result.summaries.map((summary) => summary.email)).toEqual(['member@test.local']);
   });
 
   it('sends once per user per digest date unless forced', async () => {

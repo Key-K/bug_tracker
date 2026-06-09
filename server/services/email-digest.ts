@@ -187,6 +187,11 @@ function unique<T>(values: T[]): T[] {
   return [...new Set(values)];
 }
 
+function isDeliverableDigestEmail(email: string): boolean {
+  const normalized = email.trim().toLowerCase();
+  return normalized.includes('@') && !normalized.endsWith('@scout.local');
+}
+
 function getEvents(periodStart: string, periodEnd: string): DigestEvent[] {
   const created = db.select().from(scoutItems)
     .where(and(gte(scoutItems.createdAt, periodStart), lt(scoutItems.createdAt, periodEnd)))
@@ -236,7 +241,8 @@ function getRecipients(events: DigestEvent[]): User[] {
   if (userIds.length === 0) return [];
   return db.select().from(users)
     .where(and(inArray(users.id, userIds), eq(users.isActive, true)))
-    .all();
+    .all()
+    .filter((user) => isDeliverableDigestEmail(user.email));
 }
 
 function isUserRelatedToEvent(userId: string, event: DigestEvent): boolean {
