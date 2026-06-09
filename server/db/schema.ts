@@ -224,6 +224,27 @@ export const scoutBridgeJobs = sqliteTable('scout_bridge_jobs', {
   index('idx_scout_bridge_jobs_status_next').on(table.status, table.nextAttemptAt),
 ]);
 
+export const emailDigestDeliveries = sqliteTable('email_digest_deliveries', {
+  id: text('id').primaryKey(),
+  recipientUserId: text('recipient_user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  recipientEmail: text('recipient_email').notNull(),
+  digestDate: text('digest_date').notNull(),
+  periodStart: text('period_start').notNull(),
+  periodEnd: text('period_end').notNull(),
+  itemCount: integer('item_count').notNull().default(0),
+  createdItemCount: integer('created_item_count').notNull().default(0),
+  statusChangeCount: integer('status_change_count').notNull().default(0),
+  assignmentCount: integer('assignment_count').notNull().default(0),
+  typeChangeCount: integer('type_change_count').notNull().default(0),
+  statusTransitions: text('status_transitions').notNull().default('{}'),
+  messageId: text('message_id'),
+  sentAt: text('sent_at').notNull(),
+  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+}, (table) => [
+  uniqueIndex('idx_email_digest_user_date_unique').on(table.recipientUserId, table.digestDate),
+  index('idx_email_digest_date').on(table.digestDate),
+]);
+
 // === Webhooks ===
 export const webhooks = sqliteTable('webhooks', {
   id: text('id').primaryKey(),
@@ -273,6 +294,7 @@ export type ErrorGroup = typeof errorGroups.$inferSelect;
 export type NewErrorGroup = typeof errorGroups.$inferInsert;
 export type ErrorGroupOccurrence = typeof errorGroupOccurrences.$inferSelect;
 export type ScoutBridgeJob = typeof scoutBridgeJobs.$inferSelect;
+export type EmailDigestDelivery = typeof emailDigestDeliveries.$inferSelect;
 export type AuditLogEntry = typeof auditLog.$inferSelect;
 export type Webhook = typeof webhooks.$inferSelect;
 export type ApiKey = typeof apiKeys.$inferSelect;

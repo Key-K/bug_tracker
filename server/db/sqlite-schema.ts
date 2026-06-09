@@ -27,6 +27,7 @@ const CORE_TABLES = [
   'error_groups',
   'error_group_occurrences',
   'scout_bridge_jobs',
+  'email_digest_deliveries',
 ] as const;
 
 const TABLE_SPECS: TableSpec[] = [
@@ -333,6 +334,33 @@ const TABLE_SPECS: TableSpec[] = [
     copyColumns: ['id', 'event_id', 'source', 'status', 'attempts', 'next_attempt_at', 'processing_started_at', 'last_error', 'payload', 'created_at', 'updated_at'],
     primaryKey: ['id'],
     uniqueGroups: [['event_id']],
+  },
+  {
+    name: 'email_digest_deliveries',
+    createSql: `CREATE TABLE email_digest_deliveries (
+      id TEXT PRIMARY KEY,
+      recipient_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      recipient_email TEXT NOT NULL,
+      digest_date TEXT NOT NULL,
+      period_start TEXT NOT NULL,
+      period_end TEXT NOT NULL,
+      item_count INTEGER NOT NULL DEFAULT 0,
+      created_item_count INTEGER NOT NULL DEFAULT 0,
+      status_change_count INTEGER NOT NULL DEFAULT 0,
+      assignment_count INTEGER NOT NULL DEFAULT 0,
+      type_change_count INTEGER NOT NULL DEFAULT 0,
+      status_transitions TEXT NOT NULL DEFAULT '{}',
+      message_id TEXT,
+      sent_at TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    indexSql: [
+      'CREATE UNIQUE INDEX idx_email_digest_user_date_unique ON email_digest_deliveries(recipient_user_id, digest_date)',
+      'CREATE INDEX idx_email_digest_date ON email_digest_deliveries(digest_date)',
+    ],
+    copyColumns: ['id', 'recipient_user_id', 'recipient_email', 'digest_date', 'period_start', 'period_end', 'item_count', 'created_item_count', 'status_change_count', 'assignment_count', 'type_change_count', 'status_transitions', 'message_id', 'sent_at', 'created_at'],
+    primaryKey: ['id'],
+    uniqueGroups: [['recipient_user_id', 'digest_date']],
   },
 ];
 

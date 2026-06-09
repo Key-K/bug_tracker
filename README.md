@@ -45,6 +45,7 @@ Tester saves note     →  Widget stores page-level observation without workflow
 | **Dashboard** | React SPA, bug/note/task items, runtime error groups, manual creation, note-to-task triage, rrweb session player, items/projects/users/webhooks management, locale switcher |
 | **i18n** | Russian, English, Uzbek (Latin). Dashboard + widget. Server error codes translated on client |
 | **Agent workflows** | Manual agent skill for autonomous bug/task work, including AI triage that converts actionable notes into tasks, runtime error context handling, evidence-backed status updates, and safe non-production push/staging completion without background automation |
+| **Notifications** | Daily per-user email digest over SMTP with concise counts for created items, status transitions, assignments, type changes, affected projects, and current statuses |
 | **Auth** | JWT + API keys (`sk_live_*`), system roles (admin/member), project roles (owner/manager/developer/reporter/viewer), cross-domain SSO |
 | **Infra** | Single process (API + SPA + widget on one port), SQLite, Docker, publishable GHCR image |
 
@@ -263,6 +264,11 @@ scout.example.com {
 | `SMTP_USER` | — | SMTP username |
 | `SMTP_PASS` | — | SMTP password |
 | `SMTP_FROM` | — | Sender email address |
+| `SMTP_SECURE` | `true` for port `465`, otherwise `false` | Use implicit TLS for SMTP |
+| `SCOUT_PUBLIC_URL` | — | Public Scout URL included in notification emails |
+| `SCOUT_DAILY_DIGEST_ENABLED` | `true` when SMTP is configured | Set `false` to disable daily email digests |
+| `SCOUT_DAILY_DIGEST_TIME` | `18:00` | Local send time for daily digests, `HH:mm` |
+| `SCOUT_DAILY_DIGEST_TIMEZONE` | `Asia/Almaty` | Time zone used for "today" and send time |
 | `LOG_LEVEL` | `info` | Pino log level |
 
 ### CI/CD

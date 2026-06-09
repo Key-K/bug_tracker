@@ -10,9 +10,11 @@ import { projectRoutes } from './routes/projects.js';
 import { userRoutes } from './routes/users.js';
 import { itemRoutes } from './routes/items.js';
 import { webhookRoutes } from './routes/webhooks.js';
+import { notificationRoutes } from './routes/notifications.js';
 import { apiKeyRoutes } from './routes/api-keys.js';
 import { integrationsErrorsRoutes } from './routes/integrations-errors.js';
 import { startBridgeWorker } from './services/error-groups.js';
+import { startDailyDigestWorker } from './services/email-digest.js';
 import { eventRoutes } from './routes/events.js';
 import { docsRoutes } from './routes/docs.js';
 import { db, sqlite } from './db/client.js';
@@ -172,6 +174,7 @@ v1.route('/projects', projectRoutes);
 v1.route('/users', userRoutes);
 v1.route('/items', itemRoutes);
 v1.route('/webhooks', webhookRoutes);
+v1.route('/notifications', notificationRoutes);
 v1.route('/api-keys', apiKeyRoutes);
 v1.route('/integrations/errors', integrationsErrorsRoutes);
 
@@ -376,11 +379,13 @@ serve({ fetch: app.fetch, port }, (info) => {
 });
 
 const stopBridgeWorker = startBridgeWorker();
+const stopDailyDigestWorker = startDailyDigestWorker();
 
 // Graceful shutdown
 function shutdown() {
   logger.info('Shutting down');
   stopBridgeWorker();
+  stopDailyDigestWorker();
   sqlite.close();
   process.exit(0);
 }

@@ -78,6 +78,13 @@
       "when": 1780876800000,
       "tag": "0010_testing_status_to_review",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1780963200000,
+      "tag": "0011_email_digest_deliveries",
+      "breakpoints": true
     }
   ]
 }

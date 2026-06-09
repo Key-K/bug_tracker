@@ -22,6 +22,7 @@ const spec = {
     { name: 'Projects', description: 'Управление проектами' },
     { name: 'Users', description: 'Управление пользователями и project roles' },
     { name: 'Webhooks', description: 'Вебхуки для проектных интеграций' },
+    { name: 'Notifications', description: 'Email digests and operational notifications' },
     { name: 'API Keys', description: 'Project-scoped API keys для программного доступа' },
     { name: 'Error Integrations', description: 'Runtime error groups and observability bridge endpoints' },
     { name: 'Events', description: 'Server-Sent Events (SSE) для real-time обновлений' },
@@ -1150,6 +1151,38 @@ const spec = {
           200: { description: 'Связь удалена' },
           403: { description: 'Недостаточно прав', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
           404: { description: 'Связь или item не найден', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+        },
+      },
+    },
+
+    // ═══════════════════════ Notifications ═══════════════════════
+    '/notifications/daily-digest/run': {
+      post: {
+        tags: ['Notifications'],
+        summary: 'Run daily email digest',
+        description: 'Admin-only operational endpoint. Builds the concise per-user daily Scout email digest for a date (`YYYY-MM-DD`) and either sends it through SMTP or returns a dry-run summary. Normal delivery is handled by the daily worker using `SCOUT_DAILY_DIGEST_TIME` and `SCOUT_DAILY_DIGEST_TIMEZONE`.',
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  date: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$', description: 'Local digest date. Defaults to today in the configured digest timezone.' },
+                  dryRun: { type: 'boolean', description: 'When true, returns summaries without sending email or recording delivery.' },
+                  force: { type: 'boolean', description: 'When true, sends even if delivery for this user/date is already recorded.' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Digest run summary',
+            content: { 'application/json': { schema: { type: 'object' } } },
+          },
+          403: { description: 'Only system admin can run notification jobs manually', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
         },
       },
     },

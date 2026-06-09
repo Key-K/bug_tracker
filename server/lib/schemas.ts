@@ -321,6 +321,13 @@ export const deleteWebhookSchema = z.object({ id: uuidSchema });
 export const listWebhooksSchema = z.object({ projectId: uuidSchema });
 export const testWebhookSchema = z.object({ id: uuidSchema });
 
+// === Notifications ===
+export const runDailyDigestSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  dryRun: z.boolean().optional(),
+  force: z.boolean().optional(),
+});
+
 // === Error integrations ===
 const boundedUrlSchema = z.string().url().max(1000).optional();
 const errorSeveritySchema = z.enum(['info', 'warning', 'critical']);
