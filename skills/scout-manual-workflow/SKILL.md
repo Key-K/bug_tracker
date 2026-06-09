@@ -647,6 +647,7 @@ Rules:
 
 - Do not run polling or background automation in this manual workflow.
 - Do not mutate unrelated Scout items.
-- Do not delete Scout data, screenshots, recordings, production volumes, or user data.
+- Do not delete user/reporter Scout data, screenshots, recordings, production volumes, or business data.
+- Remove agent-created disposable verification artifacts before completion when they were created only to test the workflow: record the exact ids and evidence first, then delete the narrowest synthetic Scout item/error group/bridge job or fixture through the safest available path.
 - Do not use destructive Git or deploy commands unless explicitly requested and safe.
 - Do not bypass repo safety rules, checks, or browser verification requirements.
