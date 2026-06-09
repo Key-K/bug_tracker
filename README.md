@@ -143,7 +143,9 @@ User APIs use `projectRoles` for per-project access assignment.
 
 Scout also ships an agent skill for manual bug-tracker work. It is useful when a coding agent should take a Scout item, triage related items, inspect linked runtime error context when present, reproduce the bug, fix it in a local repository, verify the result, and update Scout notes/statuses with structured evidence without relying on background automation.
 
-For OpenCode users, Scout ships a single slash command: `/scout`. The agent infers single-item, single-next, full active queue, needs-review follow-up, changes-requested follow-up, runtime-error follow-up, or done/verified audit mode from the argument and live queue state. The command runs the full Scout workflow through `scout-manual-workflow`.
+When operating from this skill, the agent should always lead the project like a responsible maintainer: make professionally justified broad changes when needed, while preserving hard gates for production releases, external communications, destructive user-data actions, secrets exposure, and human acceptance. Arguments after `/scout` choose the work scope, not a weaker behavior profile.
+
+For OpenCode users, Scout ships a single slash command: `/scout`. The agent infers single-item, single-next, full active queue, needs-review follow-up, changes-requested follow-up, runtime-error follow-up, or done/verified audit scope from the argument and live queue state. The command runs the full Scout workflow through `scout-manual-workflow`.
 
 When running OpenCode from this repository, no skill installation is required: `.opencode/opencode.json` loads the repo `skills/` directory directly.
 
@@ -174,6 +176,8 @@ Scout developers who want live command or skill edits outside this checkout shou
 All endpoints are `POST` with JSON body. Auth via `Authorization: Bearer <jwt|api-key>`.
 
 Base path: `/api/v1/` (or `/api/` for backward compatibility).
+
+Agent/CLI convenience: `/api/items/list` and `/api/items/count` accept `projectSlug` instead of `projectId`; `/api/items/list` accepts `limit` as a `perPage` alias; item endpoints accept `itemId` as an alias for `id` where the body otherwise uses `id`.
 
 Interactive docs: `https://your-scout.example/api/docs`
 

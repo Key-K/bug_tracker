@@ -67,6 +67,17 @@ function deriveItemSource(data: ReturnType<typeof createItemSchema.parse>, apiKe
   return 'dashboard';
 }
 
+function resolveProjectLocator(projectId?: string, projectSlug?: string) {
+  const project = projectId
+    ? db.select().from(projects).where(eq(projects.id, projectId)).get()
+    : db.select().from(projects).where(eq(projects.slug, projectSlug!)).get();
+  if (!project) throw new NotFoundError('Project', 'PROJECT_NOT_FOUND');
+  if (projectSlug && project.slug !== projectSlug) {
+    throw new ValidationError('projectId and projectSlug refer to different projects', 'PROJECT_LOCATOR_MISMATCH');
+  }
+  return project;
+}
+
 function getRelatedItems(itemId: string) {
   const links = db.select().from(scoutItemLinks)
     .where(or(eq(scoutItemLinks.sourceItemId, itemId), eq(scoutItemLinks.targetItemId, itemId)))
@@ -154,8 +165,11 @@ export const itemRoutes = new Hono()
   .post('/list',
     zValidator('json', listItemsSchema),
     async (c) => {
-      const { projectId, itemType, status, statuses, priority, assigneeId, search, page, perPage } = c.req.valid('json');
+      const { projectId: requestedProjectId, projectSlug, itemType, status, statuses, priority, assigneeId, search, page, perPage, limit } = c.req.valid('json');
       const user = c.get('user');
+      const project = resolveProjectLocator(requestedProjectId, projectSlug);
+      const projectId = project.id;
+      const pageSize = perPage ?? limit ?? 20;
 
       // Check project access
       if (!checkProjectAccess(user.id, user.role, projectId, c.get('apiKey'))) {
@@ -175,8 +189,8 @@ export const itemRoutes = new Hono()
       const items = db.select().from(scoutItems)
         .where(where)
         .orderBy(desc(scoutItems.createdAt))
-        .limit(perPage)
-        .offset((page - 1) * perPage)
+        .limit(pageSize)
+        .offset((page - 1) * pageSize)
         .all();
 
       const [{ total }] = db.select({ total: count() }).from(scoutItems).where(where).all();
@@ -186,9 +200,9 @@ export const itemRoutes = new Hono()
           items: items.map(enrichItem),
           pagination: {
             page,
-            perPage,
+            perPage: pageSize,
             total,
-            totalPages: Math.ceil(total / perPage),
+            totalPages: Math.ceil(total / pageSize),
           },
         },
       });
@@ -233,8 +247,10 @@ export const itemRoutes = new Hono()
   .post('/count',
     zValidator('json', countItemsSchema),
     async (c) => {
-      const { projectId, itemType } = c.req.valid('json');
+      const { projectId: requestedProjectId, projectSlug, itemType } = c.req.valid('json');
       const user = c.get('user');
+      const project = resolveProjectLocator(requestedProjectId, projectSlug);
+      const projectId = project.id;
 
       // Check project access
       if (!checkProjectAccess(user.id, user.role, projectId, c.get('apiKey'))) {

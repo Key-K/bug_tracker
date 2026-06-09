@@ -99,6 +99,11 @@ describe('Middleware', () => {
       expect(res.status).toBe(403);
     });
 
+    it('member CANNOT access items in another project by slug (403)', async () => {
+      const res = await post('/list', { projectSlug: 'other-project' }, ctx.memberToken);
+      expect(res.status).toBe(403);
+    });
+
     it('developer member can access items in their project (200)', async () => {
       const res = await post('/list', { projectId: ctx.projectId }, ctx.developerToken);
       expect(res.status).toBe(200);

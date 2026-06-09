@@ -160,6 +160,23 @@ describe('Items routes', () => {
     expect(body.data.items.map((item: any) => item.id).sort()).toEqual([newItem.id, inProgressItem.id].sort());
   });
 
+  it('POST /list — accepts projectSlug and limit aliases for agent clients', async () => {
+    await createTestItem();
+    await createTestItem();
+
+    const res = await post('/list', {
+      projectSlug: 'test-project',
+      statuses: ['new'],
+      limit: 1,
+    }, ctx.adminToken);
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as any;
+    expect(body.data.items).toHaveLength(1);
+    expect(body.data.pagination.perPage).toBe(1);
+    expect(body.data.pagination.total).toBe(2);
+  });
+
   // === GET ===
 
   it('POST /get — returns item with notes', async () => {
@@ -173,6 +190,15 @@ describe('Items routes', () => {
     expect(Array.isArray(body.data.notes)).toBe(true);
     expect(body.data.evidence).toBeDefined();
     expect(Array.isArray(body.data.evidence)).toBe(true);
+  });
+
+  it('POST /get — accepts itemId alias for agent clients', async () => {
+    const item = await createTestItem();
+
+    const res = await post('/get', { itemId: item.id }, ctx.adminToken);
+    expect(res.status).toBe(200);
+    const body = await res.json() as any;
+    expect(body.data.id).toBe(item.id);
   });
 
   it('POST /get — non-existent returns 404', async () => {
@@ -192,6 +218,15 @@ describe('Items routes', () => {
     expect(body.data.counts.in_progress).toBe(0);
     expect(body.data.counts.changes_requested).toBe(0);
     expect(body.data.counts.verified).toBe(0);
+  });
+
+  it('POST /count — accepts projectSlug alias for agent clients', async () => {
+    await createTestItem();
+
+    const res = await post('/count', { projectSlug: 'test-project' }, ctx.adminToken);
+    expect(res.status).toBe(200);
+    const body = await res.json() as any;
+    expect(body.data.counts.new).toBe(1);
   });
 
   // === CLAIM ===

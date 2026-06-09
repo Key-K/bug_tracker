@@ -9,6 +9,20 @@ const paginationSchema = z.object({
 });
 
 const uuidSchema = z.string().uuid();
+const projectSlugSchema = z.string()
+  .regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with hyphens')
+  .min(2)
+  .max(50);
+
+function withIdAlias<T extends z.ZodRawShape>(targetKey: 'id' | 'itemId', schema: z.ZodObject<T>) {
+  return z.preprocess((input) => {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return input;
+    const record = input as Record<string, unknown>;
+    const sourceKey = targetKey === 'id' ? 'itemId' : 'id';
+    if (record[targetKey] !== undefined || record[sourceKey] === undefined) return input;
+    return { ...record, [targetKey]: record[sourceKey] };
+  }, schema);
+}
 
 const allowedOriginSchema = z.string().url().max(500).transform((value, ctx) => {
   try {
@@ -70,10 +84,7 @@ export const loginSchema = z.object({
 // === Projects ===
 export const createProjectSchema = z.object({
   name: z.string().min(1).max(100),
-  slug: z.string()
-    .regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with hyphens')
-    .min(2)
-    .max(50),
+  slug: projectSlugSchema,
   allowedOrigins: z.array(allowedOriginSchema).default([]),
 });
 
@@ -148,52 +159,63 @@ export const createItemSchema = z.object({
   metadata: z.record(z.string()).nullish(),               // auto-captured environment data
 });
 
-export const listItemsSchema = paginationSchema.extend({
-  projectId: uuidSchema,
+export const listItemsSchema = z.object({
+  page: z.number().int().min(1).default(1),
+  perPage: z.number().int().min(1).max(100).optional(),
+  limit: z.number().int().min(1).max(100).optional(),
+  projectId: uuidSchema.optional(),
+  projectSlug: projectSlugSchema.optional(),
   itemType: itemTypeSchema.optional(),
   status: itemStatusSchema.optional(),
   statuses: z.array(itemStatusSchema).min(1).max(ITEM_STATUSES.length).optional(),
   priority: z.enum(['critical', 'high', 'medium', 'low']).optional(),
   assigneeId: uuidSchema.optional(),
   search: z.string().max(200).optional(),
+}).refine((value) => value.projectId || value.projectSlug, {
+  message: 'projectId or projectSlug is required',
+  path: ['projectId'],
 });
 
-export const getItemSchema = z.object({ id: uuidSchema });
+export const getItemSchema = withIdAlias('id', z.object({ id: uuidSchema }));
 
 export const countItemsSchema = z.object({
-  projectId: uuidSchema,
+  projectId: uuidSchema.optional(),
+  projectSlug: projectSlugSchema.optional(),
   itemType: itemTypeSchema.optional(),
   status: itemStatusSchema.optional(),
+}).refine((value) => value.projectId || value.projectSlug, {
+  message: 'projectId or projectSlug is required',
+  path: ['projectId'],
 });
 
-export const claimItemSchema = z.object({ id: uuidSchema });
+export const claimItemSchema = withIdAlias('id', z.object({ id: uuidSchema }));
 
-export const resolveItemSchema = z.object({
+export const resolveItemSchema = withIdAlias('id', z.object({
   id: uuidSchema,
   resolutionNote: z.string().max(5000).optional(),
   branchName: z.string().max(255).optional(),
   mrUrl: z.string().url().max(500).optional(),
   evidence: itemEvidenceSchema.optional(),
-});
+}));
 
-export const cancelItemSchema = z.object({ id: uuidSchema });
+export const cancelItemSchema = withIdAlias('id', z.object({ id: uuidSchema }));
 
-export const updateItemStatusSchema = z.object({
+export const updateItemStatusSchema = withIdAlias('id', z.object({
   id: uuidSchema,
   status: updateItemStatusTargetSchema,
   branchName: z.string().max(255).optional(),
   mrUrl: z.string().url().max(500).optional(),
   attemptCount: z.number().int().min(0).optional(),
   evidence: itemEvidenceSchema.optional(),
-});
+}));
 
-export const verifyItemSchema = z.object({
+export const verifyItemSchema = withIdAlias('id', z.object({
   id: uuidSchema,
   comment: z.string().max(5000).optional(),
   evidence: itemEvidenceSchema.optional(),
-});
+}));
 
-export const requestChangesItemSchema = z.object({
+export const requestChangesItemSchema = withIdAlias('id', z.object({
   id: uuidSchema,
   summary: z.string().min(3).max(2000),
   expected: z.string().min(1).max(2000),
@@ -201,34 +223,34 @@ export const requestChangesItemSchema = z.object({
   steps: z.string().max(5000).optional(),
   url: z.string().max(1000).optional(),
   evidence: itemEvidenceSchema.optional(),
-});
+}));
 
-export const deleteItemSchema = z.object({ id: uuidSchema });
+export const deleteItemSchema = withIdAlias('id', z.object({ id: uuidSchema }));
 
-export const updateItemSchema = z.object({
+export const updateItemSchema = withIdAlias('id', z.object({
   id: uuidSchema,
   itemType: itemTypeSchema.optional(),
   message: z.string().min(3).optional(),
   assigneeId: uuidSchema.nullish(),
   priority: z.enum(['critical', 'high', 'medium', 'low']).optional(),
   labels: z.array(z.string().max(50)).max(10).optional(),
-});
+}));
 
-export const reopenItemSchema = z.object({
+export const reopenItemSchema = withIdAlias('id', z.object({
   id: uuidSchema,
   status: z.enum(['new', 'in_progress']).optional(),
   reason: z.enum(['audit_failed', 'audit_blocked', 'staging_failed', 'regression', 'manual']).optional(),
   auditResult: z.enum(['fail', 'blocked']).optional(),
-});
+}));
 
-export const addNoteSchema = z.object({
+export const addNoteSchema = withIdAlias('itemId', z.object({
   itemId: uuidSchema,
   content: z.string().min(1).max(5000),
-});
+}));
 
-export const addEvidenceSchema = itemEvidenceSchema.extend({
+export const addEvidenceSchema = withIdAlias('itemId', itemEvidenceSchema.extend({
   itemId: uuidSchema,
-});
+}));
 
 export const itemLinkTypeSchema = z.enum(['related', 'duplicate', 'blocks', 'blocked_by', 'caused_by', 'conflicts']);
 

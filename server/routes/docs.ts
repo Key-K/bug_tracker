@@ -9,7 +9,7 @@ const spec = {
     title: 'Scout Bug Tracking API',
     version: '1.0.0',
     description:
-      'Scout — self-hosted bug tracker for AI-assisted product teams. Все API-эндпоинты используют метод POST с JSON-телом (кроме health, events, docs). Авторизация через Bearer JWT или API Key (`sk_live_...`).',
+      'Scout — self-hosted bug tracker for AI-assisted product teams. Все API-эндпоинты используют метод POST с JSON-телом (кроме health, events, docs). Авторизация через Bearer JWT или API Key (`sk_live_...`). Agent convenience aliases: `/items/list` and `/items/count` accept `projectSlug` instead of `projectId`, `/items/list` accepts `limit` as a `perPage` alias, and item endpoints accept `itemId` as an alias for `id` where the body otherwise uses `id`.',
     contact: { url: 'https://your-scout.example' },
   },
   servers: [
@@ -578,9 +578,10 @@ const spec = {
             'application/json': {
               schema: {
                 type: 'object',
-                required: ['projectId'],
+                anyOf: [{ required: ['projectId'] }, { required: ['projectSlug'] }],
                 properties: {
                   projectId: { type: 'string', format: 'uuid' },
+                  projectSlug: { type: 'string', pattern: '^[a-z0-9-]+$', description: 'Agent-friendly alias for selecting a project when the UUID is not known yet.' },
                   itemType: { $ref: '#/components/schemas/ItemType' },
                   status: { $ref: '#/components/schemas/ItemStatus' },
                   statuses: { type: 'array', items: { $ref: '#/components/schemas/ItemStatus' }, minItems: 1, maxItems: ITEM_STATUSES.length, description: 'Filter by multiple statuses, useful for human queue groups such as Needs Review = review + changes_requested. If status is provided, status takes precedence.' },
@@ -589,6 +590,7 @@ const spec = {
                   search: { type: 'string', maxLength: 200, description: 'Поиск по тексту сообщения (LIKE)' },
                   page: { type: 'integer', minimum: 1, default: 1 },
                   perPage: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+                  limit: { type: 'integer', minimum: 1, maximum: 100, description: 'Alias for perPage for CLI/agent clients.' },
                 },
               },
             },
@@ -630,9 +632,10 @@ const spec = {
             'application/json': {
               schema: {
                 type: 'object',
-                required: ['id'],
+                anyOf: [{ required: ['id'] }, { required: ['itemId'] }],
                 properties: {
                   id: { type: 'string', format: 'uuid' },
+                  itemId: { type: 'string', format: 'uuid', description: 'Alias for id for CLI/agent clients.' },
                 },
               },
             },
@@ -682,9 +685,10 @@ const spec = {
             'application/json': {
               schema: {
                 type: 'object',
-                required: ['projectId'],
+                anyOf: [{ required: ['projectId'] }, { required: ['projectSlug'] }],
                 properties: {
                   projectId: { type: 'string', format: 'uuid' },
+                  projectSlug: { type: 'string', pattern: '^[a-z0-9-]+$', description: 'Agent-friendly alias for selecting a project when the UUID is not known yet.' },
                   itemType: { $ref: '#/components/schemas/ItemType' },
                 },
               },
