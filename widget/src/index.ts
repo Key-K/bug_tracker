@@ -59,6 +59,7 @@ async function init(): Promise<void> {
   // --- Shadow DOM setup ---
   const host = document.createElement('div');
   host.id = 'scout-widget-root';
+  host.style.cssText = 'display:block;width:0;height:0;overflow:visible;pointer-events:none';
 
   document.body.appendChild(host);
   const shadow = host.attachShadow({ mode: 'open' });

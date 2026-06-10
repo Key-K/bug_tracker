@@ -1,6 +1,11 @@
 export const WIDGET_STYLES = `
   :host {
     all: initial;
+    display: block;
+    width: 0;
+    height: 0;
+    overflow: visible;
+    pointer-events: none;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     font-size: 14px;
     color: #111827;
@@ -18,6 +23,15 @@ export const WIDGET_STYLES = `
 
   .hidden {
     display: none !important;
+  }
+
+  .scout-fab,
+  .scout-overlay,
+  .scout-panel-backdrop,
+  .scout-panel,
+  .scout-loading-overlay,
+  .scout-toast {
+    pointer-events: auto;
   }
 
   /* FAB */
